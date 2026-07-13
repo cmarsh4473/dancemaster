@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dance Studio Manager</title>
+  <style>
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-500: #6b7280;
+      --gray-700: #374151;
+      --gray-900: #111827;
+      --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
+      --radius: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background: var(--gray-50); color: var(--gray-900); font-size: 14px; line-height: 1.5; }
+    
+    /* Header */
+    .app-header { background: #fff; border-bottom: 1px solid var(--gray-200); padding: 16px 24px; position: sticky; top: 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 700; color: var(--primary); }
+    .brand-icon { font-size: 24px; }
+    .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .season-wrap { display: flex; align-items: center; gap: 8px; background: var(--gray-100); padding: 6px 12px; border-radius: var(--radius); }
+    .season-wrap label { font-size: 12px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; }
+    .season-input { border: none; background: transparent; font-size: 14px; font-weight: 500; color: var(--gray-900); width: 110px; outline: none; font-family: inherit; }
+    .btn { border: none; border-radius: var(--radius); padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px; font-family: inherit; }
+    .btn:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+    .btn:active { transform: translateY(0); }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-secondary { background: var(--gray-100); color: var(--gray-700); border: 1px solid var(--gray-200); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+    
+    /* Stats */
+    .stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; padding: 20px 24px; }
+    .stat-card { background: #fff; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); border: 1px solid var(--gray-200); display: flex; align-items: center; gap: 12px; }
+    .stat-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .stat-icon.blue { background: #eef2ff; }
+    .stat-icon.green { background: #ecfdf5; }
+    .stat-icon.yellow { background: #fffbeb; }
+    .stat-icon.red { background: #fef2f2; }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--gray-900); line-height: 1; }
+    .stat-label { font-size: 12px; color: var(--gray-500); font-weight: 500; margin-top: 4px; }
+    
+    /* Toolbar */
+    .toolbar { padding: 0 24px 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .search-box { flex: 1; min-width: 220px; position: relative; }
+    .search-box input { width: 100%; border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 8px 12px 8px 36px; font-size: 13px; font-family: inherit; background: #fff; outline: none; transition: border-color 0.15s; }
+    .search-box input:focus { border-color: var(--primary); }
+    .search-box::before { content: "🔍"; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); opacity: 0.4; font-size: 12px; }
+    .filter-select { border: 1px solid var(--gray-200); border-radius: var(--radius); padding: 8px 12px; font-size: 13px; font-family: inherit; background: #fff; outline: none; min-width: 140px; }
+    
+    /* View Toggle */
+    .view-toggle { padding: 0 24px 12px; display: flex; gap: 8px; }
+    .view-btn { border: 1px solid var(--gray-200); background: #fff; border-radius: 8px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; color: var(--gray-500); transition: all 0.15s; }
+    .view-btn:hover { background: var(--gray-50); }
+    .view-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    
+    /* Table */
+    .table-container { padding: 0 24px 24px; display: block; }
+    .table-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--gray-200); overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: var(--gray-50); color: var(--gray-500); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--gray-200); white-space: nowrap; user-select: none; }
+    td { padding: 10px 16px; border-bottom: 1px solid var(--gray-100); vertical-align: middle; font-size: 13px; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafafa; }
+    tr.dirty td { background: #eef2ff !important; }
+    tr.deleted td { opacity: 0.5; text-decoration: line-through; }
+    
+    .cell-title { font-weight: 600; color: var(--gray-900); max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cell-sub { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+    .cell-time { font-weight: 500; color: var(--gray-700); white-space: nowrap; }
+    .cell-time span { color: var(--gray-500); font-weight: 400; }
+    
+    .studio-select { border: 1px solid var(--gray-200); border-radius: 6px; padding: 6px 24px 6px 8px; font-size: 12px; font-family: inherit; background: #fff; cursor: pointer; outline: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 6px center; }
+    .studio-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+    .studio-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    
+    .email-input { border: 1px solid var(--gray-200); border-radius: 6px; padding: 6px 8px; font-size: 12px; font-family: inherit; width: 100%; min-width: 160px; outline: none; }
+    .email-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+    .email-input::placeholder { color: var(--gray-300); }
+    
+    .status-pill { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+    .status-active { background: #dcfce7; color: #166534; }
+    .status-deleted { background: #fee2e2; color: #991b1b; }
+    .status-unassigned { background: #fef3c7; color: #92400e; }
+    
+    .status-select { border: 1px solid var(--gray-200); border-radius: 6px; padding: 5px 8px; font-size: 12px; font-family: inherit; outline: none; cursor: pointer; }
+    .status-select:focus { border-color: var(--primary); }
+    
+    .action-btn { background: none; border: none; cursor: pointer; padding: 6px; border-radius: 6px; color: var(--gray-500); transition: all 0.15s; }
+    .action-btn:hover { background: var(--gray-100); color: var(--danger); }
+    
+    .error-badge { display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: help; }
+    
+    /* Calendar */
+    .calendar-container { padding: 0 24px 24px; display: none; }
+    .calendar-container.show { display: block; }
+    .cal-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); border: 1px solid var(--gray-200); overflow: hidden; display: flex; flex-direction: column; max-height: 78vh; }
+    .cal-header { display: flex; border-bottom: 1px solid var(--gray-200); background: var(--gray-50); flex-shrink: 0; }
+    .cal-time-header { width: 60px; flex-shrink: 0; border-right: 1px solid var(--gray-200); }
+    .cal-day-header { flex: 1; padding: 10px; text-align: center; font-weight: 700; font-size: 13px; color: var(--gray-700); border-right: 1px solid var(--gray-200); }
+    .cal-day-header:last-child { border-right: none; }
+    .cal-day-header.today { background: #eef2ff; color: var(--primary); }
+    
+    .cal-body { display: flex; overflow-y: auto; position: relative; }
+    .cal-time-col { width: 60px; flex-shrink: 0; border-right: 1px solid var(--gray-200); position: relative; background: #fff; }
+    .cal-time-label { position: absolute; right: 6px; font-size: 11px; color: var(--gray-500); font-weight: 600; transform: translateY(-50%); }
+    .cal-day-col { flex: 1; border-right: 1px solid var(--gray-200); position: relative; min-height: 780px; }
+    .cal-day-col:last-child { border-right: none; }
+    .cal-grid-line { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--gray-200); pointer-events: none; }
+    .cal-grid-line.hour { border-top: 1px solid var(--gray-300); }
+    
+    .cal-event { position: absolute; border-radius: 6px; padding: 4px 6px; font-size: 11px; cursor: pointer; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: transform 0.1s, box-shadow 0.1s; border: none; }
+    .cal-event:hover { transform: translateY(-1px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10; }
+    .cal-event-title { font-weight: 700; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .cal-event-meta { font-size: 10px; margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; opacity: 0.9; }
+    
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--gray-500); }
+    .empty-state-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+    
+    /* Inline Edit Panel (slides out from right) */
+    .edit-panel-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 250; }
+    .edit-panel-overlay.show { display: block; }
+    .edit-panel { position: fixed; top: 0; right: 0; width: 340px; height: 100%; background: #fff; box-shadow: -4px 0 20px rgba(0,0,0,0.15); z-index: 260; transform: translateX(100%); transition: transform 0.25s ease; display: flex; flex-direction: column; }
+    .edit-panel.show { transform: translateX(0); }
+    .edit-panel-header { padding: 20px 24px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; }
+    .edit-panel-header h3 { font-size: 16px; font-weight: 700; }
+    .edit-panel-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--gray-500); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+    .edit-panel-close:hover { background: var(--gray-100); color: var(--gray-900); }
+    .edit-panel-body { padding: 20px 24px; flex: 1; overflow-y: auto; }
+    .edit-field { margin-bottom: 16px; }
+    .edit-field label { display: block; font-size: 11px; font-weight: 700; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .edit-field .value { font-size: 14px; font-weight: 600; color: var(--gray-900); padding: 8px 0; }
+    .edit-field select, .edit-field input { width: 100%; border: 1px solid var(--gray-200); border-radius: 8px; padding: 10px 12px; font-size: 13px; font-family: inherit; outline: none; }
+    .edit-field select:focus, .edit-field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+    .edit-panel-footer { padding: 16px 24px; border-top: 1px solid var(--gray-200); display: flex; gap: 8px; }
+    .edit-panel-footer .btn { flex: 1; justify-content: center; }
+    
+    /* Floating Save Bar */
+    .save-bar { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--gray-900); color: #fff; padding: 12px 20px; border-radius: 50px; display: flex; align-items: center; gap: 16px; box-shadow: var(--shadow-lg); transition: transform 0.3s ease; z-index: 100; }
+    .save-bar.show { transform: translateX(-50%) translateY(0); }
+    .save-bar-text { font-size: 13px; font-weight: 500; }
+    
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: center; justify-content: center; padding: 20px; backdrop-filter: blur(4px); }
+    .modal-overlay.show { display: flex; }
+    .modal { background: #fff; border-radius: 16px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); animation: modalIn 0.2s ease; }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid var(--gray-200); display: flex; justify-content: space-between; align-items: center; }
+    .modal-header h2 { font-size: 18px; font-weight: 700; }
+    .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--gray-500); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+    .modal-close:hover { background: var(--gray-100); color: var(--gray-900); }
+    .modal-body { padding: 24px; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full { grid-column: 1 / -1; }
+    .form-label { font-size: 12px; font-weight: 600; color: var(--gray-700); text-transform: uppercase; letter-spacing: 0.3px; }
+    .form-input, .form-select { border: 1px solid var(--gray-200); border-radius: 8px; padding: 10px 12px; font-size: 13px; font-family: inherit; outline: none; transition: all 0.15s; background: #fff; }
+    .form-input:focus, .form-select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+    .form-select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 30px; }
+    .hint { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+    
+    /* Toast */
+    .toast-container { position: fixed; top: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+    .toast { background: #fff; border-radius: 10px; padding: 12px 16px; box-shadow: var(--shadow-lg); border-left: 4px solid var(--primary); display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 500; animation: toastIn 0.3s ease; max-width: 360px; }
+    .toast.success { border-left-color: var(--success); }
+    .toast.error { border-left-color: var(--danger); }
+    .toast.warning { border-left-color: var(--warning); }
+    @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    
+    /* Loading */
+    .page-loader { position: fixed; inset: 0; background: var(--gray-50); z-index: 400; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+    .page-loader.hidden { display: none; }
+    .spinner { width: 40px; height: 40px; border: 3px solid var(--gray-200); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    
+    @media (max-width: 768px) {
+      .app-header { padding: 12px 16px; }
+      .stats-bar, .toolbar, .view-toggle, .table-container, .calendar-container { padding-left: 16px; padding-right: 16px; }
+      .form-grid { grid-template-columns: 1fr; }
+      .cell-title { max-width: 140px; }
+      .edit-panel { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Page Loader -->
+<div class="page-loader" id="pageLoader">
+  <div class="spinner"></div>
+  <div style="color: var(--gray-500); font-weight: 500;">Loading studio data...</div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Header -->
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-icon">🩰</span>
+    <span>Dance Studio Manager</span>
+  </div>
+  <div class="header-actions">
+    <div class="season-wrap">
+      <label>Season Start</label>
+      <input type="text" class="season-input" id="seasonStart" placeholder="MM/DD/YYYY">
+    </div>
+    <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh</button>
+    <button class="btn btn-success" onclick="runSync()" id="syncBtn">⚡ Sync to Calendar</button>
+    <button class="btn btn-primary" onclick="openModal()">➕ Add Class</button>
+  </div>
+</header>
+
+<!-- Stats -->
+<div class="stats-bar" id="statsBar">
+  <div class="stat-card"><div class="stat-icon blue">📋</div><div><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total Classes</div></div></div>
+  <div class="stat-card"><div class="stat-icon green">✅</div><div><div class="stat-value" id="statActive">0</div><div class="stat-label">Active</div></div></div>
+  <div class="stat-card"><div class="stat-icon yellow">⚠️</div><div><div class="stat-value" id="statUnassigned">0</div><div class="stat-label">No Studio</div></div></div>
+  <div class="stat-card"><div class="stat-icon red">👤</div><div><div class="stat-value" id="statNoInstructor">0</div><div class="stat-label">No Instructor</div></div></div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="search-box"><input type="text" id="searchInput" placeholder="Search classes..." oninput="applyFilters()"></div>
+  <select class="filter-select" id="studioFilter" onchange="applyFilters()"><option value="">All Studios</option></select>
+  <select class="filter-select" id="statusFilter" onchange="applyFilters()">
+    <option value="">All Status</option>
+    <option value="Active">Active</option>
+    <option value="Deleted">Deleted</option>
+  </select>
+  <select class="filter-select" id="dayFilter" onchange="applyFilters()">
+    <option value="">All Days</option>
+    <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option>
+  </select>
+</div>
+
+<!-- View Toggle -->
+<div class="view-toggle">
+  <button class="view-btn active" id="listViewBtn" onclick="switchView('list')">📋 List View</button>
+  <button class="view-btn" id="calViewBtn" onclick="switchView('calendar')">📅 Calendar View</button>
+</div>
+
+<!-- List View -->
+<div class="table-container" id="tableContainer">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Class</th>
+          <th>Schedule</th>
+          <th>Studio</th>
+          <th>Instructor Email</th>
+          <th>Status</th>
+          <th style="width:60px"></th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr><td colspan="6" class="empty-state"><div class="empty-state-icon">📭</div><div>Loading classes...</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Calendar View -->
+<div class="calendar-container" id="calendarContainer">
+  <div class="cal-wrap">
+    <div class="cal-header">
+      <div class="cal-time-header"></div>
+      <div class="cal-day-header" id="calDayHeader0">Mon</div>
+      <div class="cal-day-header" id="calDayHeader1">Tue</div>
+      <div class="cal-day-header" id="calDayHeader2">Wed</div>
+      <div class="cal-day-header" id="calDayHeader3">Thu</div>
+      <div class="cal-day-header" id="calDayHeader4">Fri</div>
+      <div class="cal-day-header" id="calDayHeader5">Sat</div>
+    </div>
+    <div class="cal-body" id="calBody">
+      <div class="cal-time-col" id="calTimeCol"></div>
+      <div class="cal-day-col" id="calDay0"></div>
+      <div class="cal-day-col" id="calDay1"></div>
+      <div class="cal-day-col" id="calDay2"></div>
+      <div class="cal-day-col" id="calDay3"></div>
+      <div class="cal-day-col" id="calDay4"></div>
+      <div class="cal-day-col" id="calDay5"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Inline Edit Panel -->
+<div class="edit-panel-overlay" id="editPanelOverlay" onclick="closeEditPanel()"></div>
+<div class="edit-panel" id="editPanel">
+  <div class="edit-panel-header">
+    <h3>Edit Class</h3>
+    <button class="edit-panel-close" onclick="closeEditPanel()">✕</button>
+  </div>
+  <div class="edit-panel-body" id="editPanelBody">
+    <!-- Populated by JS -->
+  </div>
+  <div class="edit-panel-footer">
+    <button class="btn btn-success" onclick="saveEditPanel()">💾 Save</button>
+    <button class="btn btn-danger" onclick="deleteFromPanel()">🗑️ Delete</button>
+    <button class="btn btn-secondary" onclick="closeEditPanel()">Cancel</button>
+  </div>
+</div>
+
+<!-- Floating Save Bar -->
+<div class="save-bar" id="saveBar">
+  <span class="save-bar-text" id="saveBarText">0 unsaved changes</span>
+  <button class="btn btn-success" onclick="saveAllChanges()">Save Changes</button>
+  <button class="btn btn-secondary" onclick="discardChanges()" style="background: rgba(255,255,255,0.15); color: #fff; border: none;">Discard</button>
+</div>
+
+<!-- Add Class Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Add New Class</h2>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Class Name *</label>
+          <input class="form-input" id="newName" placeholder="e.g. Pre Dance Ages 3 & 4 - CLT: Mon 5:15 - 6:00">
+          <div class="hint">Include day & time in the name, or use the fields below.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Day Pattern *</label>
+          <select class="form-select" id="newDay">
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+            <option>Thursday</option><option>Friday</option><option>Saturday</option>
+            <option>MW</option><option>TuTh</option><option>TuWTh</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Start Time *</label>
+          <input class="form-input" id="newStartTime" placeholder="5:15 PM">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Length *</label>
+          <input class="form-input" id="newLength" placeholder="0:45">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location *</label>
+          <select class="form-select" id="newLocation" onchange="updateNewStudioOptions()">
+            <option>Charlotte</option><option>Concord</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Studio *</label>
+          <select class="form-select" id="newStudio"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Max Size</label>
+          <input class="form-input" id="newMaxSize" placeholder="15">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Instructor Email</label>
+          <input class="form-input" id="newInstructorEmail" type="email" placeholder="instructor@email.com">
+        </div>
+        <div class="form-group full">
+          <button class="btn btn-primary" onclick="submitNewClass()" style="width:100%; justify-content:center; padding:12px;">Add to Schedule</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let allData = { classes: [], studios: [], studioColors: {}, seasonStart: "" };
+  let dirtyRows = new Map();
+  let isLoading = false;
+  let currentView = 'list';
+  let editingRowNum = null;
+  
+  const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat'];
+  const FULL_DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const GRID_START = 8 * 60;
+  const GRID_END = 21 * 60;
+  const PX_PER_MIN = 1.2;
+  
+  // Determine if a color is dark (needs white text)
+  function isDarkColor(hex) {
+    if (!hex) return false;
+    var r = parseInt(hex.slice(1,3), 16);
+    var g = parseInt(hex.slice(3,5), 16);
+    var b = parseInt(hex.slice(5,7), 16);
+    var brightness = (r * 299 + g * 587 + b * 114) / 1000;
+    return brightness < 140;
+  }
+  
+  function showToast(message, type) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (type || '');
+    toast.innerHTML = '<span>' + (type==='success'?'✅':type==='error'?'❌':type==='warning'?'⚠️':'ℹ️') + '</span><span>' + escapeHtml(message) + '</span>';
+    container.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateX(100%)'; setTimeout(()=>toast.remove(), 300); }, 4000);
+  }
+  
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+  
+  function refreshData() {
+    if (isLoading) return;
+    isLoading = true;
+    document.getElementById('pageLoader').classList.remove('hidden');
+    
+    google.script.run
+      .withSuccessHandler(function(data) {
+        allData = data;
+        document.getElementById('seasonStart').value = data.seasonStart || '';
+        
+        const sf = document.getElementById('studioFilter');
+        sf.innerHTML = '<option value="">All Studios</option>';
+        data.studios.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.name; opt.textContent = s.name;
+          sf.appendChild(opt);
+        });
+        
+        updateNewStudioOptions();
+        applyFilters();
+        updateStats();
+        highlightToday();
+        
+        document.getElementById('pageLoader').classList.add('hidden');
+        isLoading = false;
+      })
+      .withFailureHandler(function(err) {
+        document.getElementById('pageLoader').classList.add('hidden');
+        isLoading = false;
+        showToast('Failed to load: ' + err.message, 'error');
+      })
+      .getWebAppData();
+  }
+  
+  function highlightToday() {
+    var idx = new Date().getDay() - 1;
+    if (idx >= 0 && idx < 6) {
+      document.getElementById('calDayHeader' + idx).classList.add('today');
+    }
+  }
+  
+  function updateNewStudioOptions() {
+    const loc = document.getElementById('newLocation').value;
+    const sel = document.getElementById('newStudio');
+    sel.innerHTML = '';
+    allData.studios.filter(s => s.location === loc).forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.name; opt.textContent = s.name;
+      sel.appendChild(opt);
+    });
+  }
+  
+  function applyFilters() {
+    filterAndRenderList();
+    if (currentView === 'calendar') renderCalendar();
+  }
+  
+  function switchView(view) {
+    currentView = view;
+    document.getElementById('listViewBtn').classList.toggle('active', view === 'list');
+    document.getElementById('calViewBtn').classList.toggle('active', view === 'calendar');
+    document.getElementById('tableContainer').style.display = view === 'list' ? 'block' : 'none';
+    document.getElementById('calendarContainer').classList.toggle('show', view === 'calendar');
+    if (view === 'calendar') renderCalendar();
+  }
+  
+  // ===== LIST VIEW =====
+  function filterAndRenderList() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const studioF = document.getElementById('studioFilter').value;
+    const statusF = document.getElementById('statusFilter').value;
+    const dayF = document.getElementById('dayFilter').value;
+    
+    const filtered = allData.classes.filter(c => {
+      if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return false;
+      if (studioF && c.studio !== studioF) return false;
+      if (statusF && c.status !== statusF) return false;
+      if (dayF && !c.day.includes(dayF.substring(0,2)) && !c.day.includes(dayF)) return false;
+      return true;
+    });
+    
+    const tbody = document.getElementById('tableBody');
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">📭</div><div>No classes match your filters</div></td></tr>';
+      return;
+    }
+    
+    let html = '';
+    filtered.forEach(c => {
+      const dirty = dirtyRows.get(c.rowNum);
+      const studio = dirty ? dirty.studio : c.studio;
+      const email = dirty ? dirty.instructorEmail : c.instructorEmail;
+      const status = dirty ? dirty.status : c.status;
+      const isDeleted = status === 'Deleted';
+      
+      html += `<tr class="${dirty?'dirty':''} ${isDeleted?'deleted':''}" data-row="${c.rowNum}">
+        <td>
+          <div class="cell-title" title="${escapeHtml(c.name)}">${escapeHtml(c.title)}</div>
+          <div class="cell-sub">${escapeHtml(c.location)} &bull; Max ${c.maxSize || 'N/A'}</div>
+          ${c.errorLog ? '<div class="error-badge" title="'+escapeHtml(c.errorLog)+'">⚠️ Error</div>' : ''}
+        </td>
+        <td class="cell-time">${escapeHtml(c.day)}<br><span>${escapeHtml(c.startTime)} &bull; ${escapeHtml(c.length)}</span></td>
+        <td>
+          <select class="studio-select" onchange="queueChange(${c.rowNum}, 'studio', this.value)">
+            <option value="">— Select —</option>
+            ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="email" class="email-input" value="${escapeHtml(email)}" placeholder="No email" onchange="queueChange(${c.rowNum}, 'instructorEmail', this.value)"></td>
+        <td>
+          <select class="status-select" onchange="queueChange(${c.rowNum}, 'status', this.value)">
+            <option value="Active" ${status==='Active'?'selected':''}>Active</option>
+            <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
+          </select>
+          <span class="status-pill ${status==='Active'?'status-active':status==='Deleted'?'status-deleted':'status-unassigned'}">${status || 'Active'}</span>
+        </td>
+        <td><button class="action-btn" onclick="removeClass(${c.rowNum})" title="Remove class">🗑️</button></td>
+      </tr>`;
+    });
+    tbody.innerHTML = html;
+  }
+  
+  // ===== CALENDAR VIEW =====
+  function renderCalendar() {
+    const timeCol = document.getElementById('calTimeCol');
+    for (var d = 0; d < 6; d++) {
+      document.getElementById('calDay' + d).innerHTML = '';
+    }
+    timeCol.innerHTML = '';
+    
+    const totalHeight = (GRID_END - GRID_START) * PX_PER_MIN;
+    
+    for (var h = 8; h <= 21; h++) {
+      var min = h * 60;
+      var top = (min - GRID_START) * PX_PER_MIN;
+      
+      var label = document.createElement('div');
+      label.className = 'cal-time-label';
+      label.style.top = top + 'px';
+      label.textContent = (h > 12 ? h - 12 : h) + (h >= 12 ? ' PM' : ' AM');
+      timeCol.appendChild(label);
+      
+      for (var d = 0; d < 6; d++) {
+        var line = document.createElement('div');
+        line.className = 'cal-grid-line' + (h === 21 ? '' : ' hour');
+        line.style.top = top + 'px';
+        document.getElementById('calDay' + d).appendChild(line);
+      }
+    }
+    
+    for (var d = 0; d < 6; d++) {
+      document.getElementById('calDay' + d).style.height = totalHeight + 'px';
+    }
+    
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const studioF = document.getElementById('studioFilter').value;
+    const statusF = document.getElementById('statusFilter').value;
+    const dayF = document.getElementById('dayFilter').value;
+    
+    var dayEvents = [[], [], [], [], [], []];
+    
+    allData.classes.forEach(function(c) {
+      if (c.status === 'Deleted') return;
+      if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return;
+      if (studioF && c.studio !== studioF) return;
+      if (statusF && c.status !== statusF) return;
+      
+      var days = expandDays(c.day);
+      var startMin = parseTimeToMinutes(c.startTime);
+      var duration = parseLengthToMinutes(c.length);
+      
+      if (startMin === null || duration === null) return;
+      
+      days.forEach(function(dayIdx) {
+        if (dayF && FULL_DAY_NAMES[dayIdx] !== dayF) return;
+        dayEvents[dayIdx].push({
+          start: startMin,
+          end: startMin + duration,
+          title: c.title,
+          studio: c.studio,
+          studioColor: allData.studioColors[c.studio] || '#999',
+          location: c.location,
+          timeStr: c.startTime + ' • ' + c.length,
+          rowNum: c.rowNum,
+          instructorEmail: c.instructorEmail,
+          status: c.status
+        });
+      });
+    });
+    
+    dayEvents.forEach(function(events, dayIdx) {
+      if (events.length === 0) return;
+      
+      events.sort(function(a,b) { return a.start - b.start || a.end - b.end; });
+      
+      var lanes = [];
+      events.forEach(function(ev) {
+        var placed = false;
+        for (var i = 0; i < lanes.length; i++) {
+          if (lanes[i] <= ev.start + 1) {
+            ev.lane = i;
+            lanes[i] = ev.end;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          ev.lane = lanes.length;
+          lanes.push(ev.end);
+        }
+      });
+      
+      var maxLanes = lanes.length || 1;
+      
+      events.forEach(function(ev) {
+        var col = document.getElementById('calDay' + dayIdx);
+        var el = document.createElement('div');
+        el.className = 'cal-event';
+        
+        var top = (ev.start - GRID_START) * PX_PER_MIN;
+        var height = (ev.end - ev.start) * PX_PER_MIN - 2;
+        if (height < 20) height = 20;
+        
+        el.style.top = top + 'px';
+        el.style.height = height + 'px';
+        el.style.left = (ev.lane * (100 / maxLanes)) + '%';
+        el.style.width = (100 / maxLanes - 0.8) + '%';
+        el.style.backgroundColor = ev.studioColor;
+        
+        var dark = isDarkColor(ev.studioColor);
+        el.style.color = dark ? '#fff' : '#1f2937';
+        
+        el.innerHTML = '<div class="cal-event-title">' + escapeHtml(ev.title) + '</div>' +
+          '<div class="cal-event-meta">' + escapeHtml(ev.timeStr) + '</div>';
+        
+        el.onclick = function() { openEditPanel(ev.rowNum); };
+        
+        col.appendChild(el);
+      });
+    });
+  }
+  
+  function expandDays(dayStr) {
+    var map = {
+      'Monday': [0], 'Tuesday': [1], 'Wednesday': [2],
+      'Thursday': [3], 'Friday': [4], 'Saturday': [5],
+      'MW': [0, 2], 'TuTh': [1, 3], 'TuWTh': [1, 2, 3]
+    };
+    return map[dayStr] || [];
+  }
+  
+  function parseTimeToMinutes(timeStr) {
+    if (!timeStr) return null;
+    var m = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+    if (m) {
+      var h = parseInt(m[1]);
+      var min = parseInt(m[2]);
+      var ampm = m[3].toUpperCase();
+      if (ampm === 'PM' && h !== 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      return h * 60 + min;
+    }
+    return null;
+  }
+  
+  function parseLengthToMinutes(lengthStr) {
+    if (!lengthStr) return null;
+    var m = lengthStr.match(/(\d{1,2}):(\d{2})/);
+    if (m) {
+      return parseInt(m[1]) * 60 + parseInt(m[2]);
+    }
+    return null;
+  }
+  
+  // ===== INLINE EDIT PANEL =====
+  function openEditPanel(rowNum) {
+    editingRowNum = rowNum;
+    var cls = allData.classes.find(c => c.rowNum === rowNum);
+    if (!cls) return;
+    
+    var dirty = dirtyRows.get(rowNum) || {};
+    var studio = dirty.studio !== undefined ? dirty.studio : cls.studio;
+    var email = dirty.instructorEmail !== undefined ? dirty.instructorEmail : cls.instructorEmail;
+    var status = dirty.status !== undefined ? dirty.status : cls.status;
+    
+    var body = document.getElementById('editPanelBody');
+    body.innerHTML = `
+      <div class="edit-field">
+        <label>Class</label>
+        <div class="value">${escapeHtml(cls.title)}</div>
+      </div>
+      <div class="edit-field">
+        <label>Schedule</label>
+        <div class="value">${escapeHtml(cls.day)} &bull; ${escapeHtml(cls.startTime)} &bull; ${escapeHtml(cls.length)}</div>
+      </div>
+      <div class="edit-field">
+        <label>Location</label>
+        <div class="value">${escapeHtml(cls.location)}</div>
+      </div>
+      <div class="edit-field">
+        <label>Studio</label>
+        <select id="panelStudio">
+          <option value="">— Select —</option>
+          ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="edit-field">
+        <label>Instructor Email</label>
+        <input type="email" id="panelEmail" value="${escapeHtml(email)}" placeholder="instructor@email.com">
+      </div>
+      <div class="edit-field">
+        <label>Status</label>
+        <select id="panelStatus">
+          <option value="Active" ${status==='Active'?'selected':''}>Active</option>
+          <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
+        </select>
+      </div>
+    `;
+    
+    document.getElementById('editPanelOverlay').classList.add('show');
+    document.getElementById('editPanel').classList.add('show');
+  }
+  
+  function closeEditPanel() {
+    document.getElementById('editPanelOverlay').classList.remove('show');
+    document.getElementById('editPanel').classList.remove('show');
+    editingRowNum = null;
+  }
+  
+  function saveEditPanel() {
+    if (!editingRowNum) return;
+    var studio = document.getElementById('panelStudio').value;
+    var email = document.getElementById('panelEmail').value.trim();
+    var status = document.getElementById('panelStatus').value;
+    
+    queueChange(editingRowNum, 'studio', studio);
+    queueChange(editingRowNum, 'instructorEmail', email);
+    queueChange(editingRowNum, 'status', status);
+    
+    closeEditPanel();
+    showToast('Changes queued. Click Save Changes to apply.', 'success');
+  }
+  
+  function deleteFromPanel() {
+    if (!editingRowNum) return;
+    if (!confirm('Mark this class as Deleted?')) return;
+    queueChange(editingRowNum, 'status', 'Deleted');
+    closeEditPanel();
+    showToast('Class marked for deletion. Save to apply.', 'warning');
+  }
+  
+  // ===== EDITING =====
+  function queueChange(rowNum, field, value) {
+    if (!dirtyRows.has(rowNum)) {
+      var original = allData.classes.find(c => c.rowNum === rowNum);
+      dirtyRows.set(rowNum, { 
+        row: rowNum, 
+        studio: original.studio, 
+        instructorEmail: original.instructorEmail, 
+        status: original.status 
+      });
+    }
+    dirtyRows.get(rowNum)[field] = value;
+    filterAndRenderList();
+    if (currentView === 'calendar') renderCalendar();
+    updateSaveBar();
+  }
+  
+  function updateSaveBar() {
+    const bar = document.getElementById('saveBar');
+    const count = dirtyRows.size;
+    if (count > 0) {
+      document.getElementById('saveBarText').textContent = count + ' unsaved change' + (count > 1 ? 's' : '');
+      bar.classList.add('show');
+    } else {
+      bar.classList.remove('show');
+    }
+  }
+  
+  function saveAllChanges() {
+    if (dirtyRows.size === 0) return;
+    const updates = Array.from(dirtyRows.values());
+    google.script.run
+      .withSuccessHandler(function(res) {
+        dirtyRows.clear();
+        updateSaveBar();
+        showToast('Saved ' + res.count + ' changes', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Save failed: ' + err.message, 'error');
+      })
+      .webSaveChanges(updates);
+  }
+  
+  function discardChanges() {
+    dirtyRows.clear();
+    updateSaveBar();
+    filterAndRenderList();
+    if (currentView === 'calendar') renderCalendar();
+    showToast('Changes discarded', 'warning');
+  }
+  
+  function removeClass(rowNum) {
+    if (!confirm('Remove this class from the schedule? It will be marked as Deleted.')) return;
+    google.script.run
+      .withSuccessHandler(function(res) {
+        showToast(res.message, 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Error: ' + err.message, 'error');
+      })
+      .webDeleteClass(rowNum);
+  }
+  
+  function updateStats() {
+    const total = allData.classes.length;
+    const active = allData.classes.filter(c => c.status === 'Active').length;
+    const unassigned = allData.classes.filter(c => !c.studio && c.status === 'Active').length;
+    const noInstructor = allData.classes.filter(c => !c.instructorEmail && c.status === 'Active').length;
+    document.getElementById('statTotal').textContent = total;
+    document.getElementById('statActive').textContent = active;
+    document.getElementById('statUnassigned').textContent = unassigned;
+    document.getElementById('statNoInstructor').textContent = noInstructor;
+  }
+  
+  // ===== ADD CLASS =====
+  function openModal() { document.getElementById('modalOverlay').classList.add('show'); }
+  function closeModal() { document.getElementById('modalOverlay').classList.remove('show'); }
+  
+  function submitNewClass() {
+    const data = {
+      name: document.getElementById('newName').value.trim(),
+      day: document.getElementById('newDay').value,
+      startTime: document.getElementById('newStartTime').value.trim(),
+      length: document.getElementById('newLength').value.trim(),
+      location: document.getElementById('newLocation').value,
+      studio: document.getElementById('newStudio').value,
+      maxSize: document.getElementById('newMaxSize').value.trim(),
+      instructorEmail: document.getElementById('newInstructorEmail').value.trim()
+    };
+    if (!data.name || !data.day || !data.startTime || !data.length || !data.location || !data.studio) {
+      showToast('Please fill all required fields (*)', 'warning');
+      return;
+    }
+    if (!/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(data.startTime)) {
+      showToast('Start Time must be like "5:15 PM"', 'warning');
+      document.getElementById('newStartTime').focus();
+      return;
+    }
+    if (!/^\d{1,2}:\d{2}$/.test(data.length)) {
+      showToast('Length must be like "0:45"', 'warning');
+      document.getElementById('newLength').focus();
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(function() {
+        closeModal();
+        showToast('Class added! Remember to Sync.', 'success');
+        document.getElementById('newName').value = '';
+        document.getElementById('newStartTime').value = '';
+        document.getElementById('newLength').value = '';
+        document.getElementById('newMaxSize').value = '';
+        document.getElementById('newInstructorEmail').value = '';
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Failed to add: ' + err.message, 'error');
+      })
+      .webAddClass(data);
+  }
+  
+  // ===== SYNC =====
+  function runSync() {
+    const seasonStart = document.getElementById('seasonStart').value.trim();
+    if (!seasonStart) {
+      showToast('Enter a Season Start Date first', 'warning');
+      document.getElementById('seasonStart').focus();
+      return;
+    }
+    if (dirtyRows.size > 0) {
+      showToast('Save your changes before syncing', 'warning');
+      return;
+    }
+    const btn = document.getElementById('syncBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Syncing...';
+    
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Sync to Calendar';
+        showToast(res.message, 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        btn.disabled = false;
+        btn.textContent = '⚡ Sync to Calendar';
+        showToast('Sync failed: ' + err.message, 'error');
+      })
+      .webSync(seasonStart);
+  }
+  
+  // Init
+  refreshData();
+</script>
+
+</body>
+</html>
