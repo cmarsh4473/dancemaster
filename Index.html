@@ -238,9 +238,10 @@
   </div>
   <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh</button>
   <button class="btn btn-success" onclick="runSync()" id="syncBtn">⚡ Sync</button>
-  <button class="btn btn-primary" id="addClassBtn" onclick="openModal()">➕ Add Class</button>
-  <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()" style="display:none;">➕ Add Student</button>
-</div>
+  <button class="btn btn-primary" id="addClassBtn" onclick="openModal()">➕ Class</button>
+  <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()" style="display:none;">➕ Student</button>
+  <button class="btn btn-secondary" id="manageRolesBtn" onclick="openRolesModal()" style="display:none;">⚙️ Roles</button>
+  </div>
 </header>
 
 <!-- Stats -->
@@ -425,6 +426,23 @@
   </div>
 </div>
 
+<!-- Manage Roles Modal -->
+<div class="modal-overlay" id="rolesModalOverlay" onclick="if(event.target===this)closeRolesModal()">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h2>Manage Roles</h2>
+      <button class="modal-close" onclick="closeRolesModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="rolesList" style="margin-bottom:16px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input class="form-input" id="newRoleName" placeholder="New role name (e.g. Assistant)..." style="flex:1;">
+        <button class="btn btn-primary" onclick="submitNewRole()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Student Modal -->
 <div class="modal-overlay" id="studentModalOverlay" onclick="if(event.target===this)closeStudentModal()">
   <div class="modal">
@@ -444,9 +462,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">Role</label>
-          <select class="form-select" id="studentRole">
-            <option>Dancer</option><option>Parent</option><option>Instructor</option><option>Admin</option><option>Other</option>
-          </select>
+          <select class="form-select" id="studentRole"></select>
         </div>
         <div class="form-group">
           <label class="form-label">Notes</label>
@@ -628,6 +644,99 @@ function updateWeekRange() {
     formatDateShort(start) + ' – ' + formatDateShort(end) + ', ' + end.getFullYear();
 }
 
+function populateRoleDropdowns() {
+  var roles = allData.roles || [];
+  var studentRole = document.getElementById('studentRole');
+  if (studentRole) {
+    studentRole.innerHTML = roles.map(function(r) {
+      return '<option value="' + escapeHtml(r) + '">' + escapeHtml(r) + '</option>';
+    }).join('');
+  }
+}
+
+function bulkAddByRole(rowNum, role) {
+  if (!allData.students) return;
+  var currentList = getPanelAttendees(rowNum);
+  var attendingSet = new Set(currentList);
+  var added = 0;
+  allData.students.forEach(function(s) {
+    if (s.role === role && !attendingSet.has(s.email)) {
+      currentList.push(s.email);
+      attendingSet.add(s.email);
+      added++;
+    }
+  });
+  if (added > 0) {
+    queueChange(rowNum, 'students', currentList);
+    renderPanelAttendees(rowNum, currentList);
+    showToast('Added ' + added + ' ' + role.toLowerCase() + (added !== 1 ? 's' : ''), 'success');
+  } else {
+    showToast('No ' + role.toLowerCase() + 's found to add', 'warning');
+  }
+}
+
+// ===== ROLES MANAGEMENT =====
+function openRolesModal() {
+  renderRolesList();
+  document.getElementById('newRoleName').value = '';
+  document.getElementById('rolesModalOverlay').classList.add('show');
+}
+
+function closeRolesModal() {
+  document.getElementById('rolesModalOverlay').classList.remove('show');
+}
+
+function renderRolesList() {
+  var roles = allData.roles || [];
+  var container = document.getElementById('rolesList');
+  if (roles.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:16px;">No roles defined</div>';
+    return;
+  }
+  container.innerHTML = roles.map(function(r, idx) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100);">' +
+      '<span style="font-weight:600;font-size:14px;">' + escapeHtml(r) + '</span>' +
+      '<button class="action-btn" onclick="deleteRoleByIndex(' + (idx + 2) + ')" title="Delete role">🗑️</button>' +
+    '</div>';
+  }).join('');
+}
+
+function submitNewRole() {
+  var name = document.getElementById('newRoleName').value.trim();
+  if (!name) {
+    showToast('Enter a role name', 'warning');
+    return;
+  }
+  if ((allData.roles || []).indexOf(name) !== -1) {
+    showToast('That role already exists', 'warning');
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast('Role added', 'success');
+      refreshData();
+      setTimeout(renderRolesList, 300);
+    })
+    .withFailureHandler(function(err) {
+      showToast('Failed: ' + err.message, 'error');
+    })
+    .addRole(name);
+}
+
+function deleteRoleByIndex(rowNum) {
+  if (!confirm('Delete this role? It will remain on existing students until changed.')) return;
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast('Role deleted', 'success');
+      refreshData();
+      setTimeout(renderRolesList, 300);
+    })
+    .withFailureHandler(function(err) {
+      showToast('Failed: ' + err.message, 'error');
+    })
+    .deleteRole(rowNum);
+}
+
 function prevWeek() {
   currentWeekOffset--;
   updateWeekRange();
@@ -669,6 +778,7 @@ function goToToday() {
       updateStats();
       highlightToday();
       updateWeekRange();
+      populateRoleDropdowns();
       if (currentView === 'students') renderStudents();
       
       document.getElementById('pageLoader').classList.add('hidden');
@@ -720,7 +830,10 @@ function switchView(view) {
   document.getElementById('studentsContainer').classList.toggle('show', view === 'students');
   document.getElementById('addClassBtn').style.display = view === 'students' ? 'none' : 'inline-flex';
   document.getElementById('addStudentBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
-  
+  document.getElementById('addClassBtn').style.display = view === 'students' ? 'none' : 'inline-flex';
+  document.getElementById('addStudentBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
+  document.getElementById('manageRolesBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
+
   if (view === 'calendar') {
     updateWeekRange();
     renderCalendar();
@@ -983,17 +1096,27 @@ function switchView(view) {
   var status = dirty.status !== undefined ? dirty.status : cls.status;
   var studentList = dirty ? (dirty.students || cls.students || []) : (cls.students || []);
   
-  // Build attending chips HTML
+  var roles = allData.roles || CONFIG.DEFAULT_ROLES;
+  
   var attendingHtml = '';
   if (studentList.length === 0) {
     attendingHtml = '<span style="color:#9ca3af;font-size:13px;">No students assigned. Search below to add.</span>';
   } else {
-    attendingHtml = studentList.map(function(s, idx) {
+    attendingHtml = studentList.map(function(s) {
       return '<div class="attendee-chip" data-email="' + escapeHtml(s) + '">' +
         '<span>' + escapeHtml(getStudentNameByEmail(s)) + '</span>' +
-        '<button type="button" class="chip-remove" onclick="removeAttendee(' + rowNum + ', \'' + escapeHtml(s) + '\')" title="Remove">✕</button>' +
+        '<button type="button" class="chip-remove" onclick="removeAttendee(' + rowNum + ', \'' + s.replace(/'/g, "\\'") + '\')" title="Remove">✕</button>' +
       '</div>';
     }).join('');
+  }
+  
+  var bulkAddHtml = '';
+  if (roles.length > 0) {
+      bulkAddHtml = roles.map(function(r) {
+      return '<button type="button" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="bulkAddByRole(' + rowNum + ', \'' + r.replace(/'/g, "\\'") + '\')">+' + escapeHtml(r) + '</button>';
+    }).join('');
+  } else {
+    bulkAddHtml = '<span style="font-size:12px;color:#9ca3af;">No roles configured</span>';
   }
   
   var body = document.getElementById('editPanelBody');
@@ -1022,7 +1145,6 @@ function switchView(view) {
       <input type="email" id="panelEmail" value="${escapeHtml(email)}" placeholder="instructor@email.com">
     </div>
     
-    <!-- NEW: Attending Section -->
     <div class="edit-field">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
         <label>Attending</label>
@@ -1030,6 +1152,16 @@ function switchView(view) {
       </div>
       <div id="panelAttendingList" style="display:flex;flex-wrap:wrap;gap:8px;min-height:44px;padding:12px;border:1px solid var(--gray-200);border-radius:10px;background:var(--gray-50);margin-bottom:10px;">
         ${attendingHtml}
+      </div>
+      
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Bulk Add by Role</span>
+          <button type="button" onclick="refreshPanelRoles(${rowNum})" style="background:none;border:none;color:var(--primary);font-size:11px;font-weight:600;cursor:pointer;padding:2px 6px;border-radius:4px;">↻ Refresh</button>
+        </div>
+        <div id="panelBulkAddContainer" style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${renderBulkAddButtonsHtml(rowNum, roles)}
+        </div>
       </div>
       
       <label style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:block;">Add Student</label>
@@ -1040,7 +1172,6 @@ function switchView(view) {
       </div>
       <div id="panelStudentResults" style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;max-height:200px;overflow-y:auto;background:#fff;display:none;margin-top:4px;"></div>
     </div>
-    <!-- END NEW -->
     
     <div class="edit-field">
       <label>Status</label>
@@ -1236,6 +1367,31 @@ function removeStudent(rowNum) {
       .webDeleteClass(rowNum);
   }
   
+  function renderBulkAddButtonsHtml(rowNum, roles) {
+  if (!roles || roles.length === 0) {
+    return '<span style="font-size:12px;color:#9ca3af;">No roles configured</span>';
+  }
+  return roles.map(function(r) {
+    return '<button type="button" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="bulkAddByRole(' + rowNum + ', \'' + r.replace(/'/g, "\\'") + '\')">+' + escapeHtml(r) + '</button>';
+  }).join('');
+}
+
+function refreshPanelRoles(rowNum) {
+  google.script.run
+    .withSuccessHandler(function(roles) {
+      allData.roles = roles; // Update local cache so other panels benefit too
+      var container = document.getElementById('panelBulkAddContainer');
+      if (container) {
+        container.innerHTML = renderBulkAddButtonsHtml(rowNum, roles);
+      }
+      showToast('Roles refreshed from sheet', 'success');
+    })
+    .withFailureHandler(function(err) {
+      showToast('Refresh failed: ' + err.message, 'error');
+    })
+    .getRoles();
+}
+
   function updateStats() {
     const total = allData.classes.length;
     const active = allData.classes.filter(c => c.status === 'Active').length;

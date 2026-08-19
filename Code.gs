@@ -6,10 +6,12 @@
 
 var CONFIG = {
   CLASSES_SHEET: "Classes",
+  ROLES_SHEET: "Roles",
   STUDIO_CONFIG_SHEET: "Studio Config",
   STUDENTS_SHEET: "Students",
   RECURRENCE_YEARS: 10,
   IGNORE_PATTERN: /\bLevel\s*[4-7]\b/i,
+  DEFAULT_ROLES: ["Snowflakes", "Rat King", "Party People", "Mother Ginger", "Other"],
   
   STUDIOS: [
     { name: "Charlotte New",      colorId: "7",  location: "Charlotte" },
@@ -107,6 +109,28 @@ function setupSpreadsheet() {
   studentsSheet.setFrozenRows(1);
   studentsSheet.autoResizeColumns(1, 4);
   
+    // Roles sheet
+  var rolesSheet = ss.getSheetByName(CONFIG.ROLES_SHEET);
+  var sheet3 = ss.getSheetByName("Sheet3");
+  
+  // Auto-fix if Sheet3 exists from a prior run
+  if (sheet3 && !rolesSheet) {
+    sheet3.setName(CONFIG.ROLES_SHEET);
+    rolesSheet = sheet3;
+  } else if (sheet3 && rolesSheet) {
+    ss.deleteSheet(sheet3); // Remove stray Sheet3
+  }
+  
+  if (!rolesSheet) {
+    rolesSheet = ss.insertSheet(CONFIG.ROLES_SHEET);
+    rolesSheet.getRange(1, 1).setValue("Role Name")
+      .setFontWeight("bold").setBackground("#ea4335").setFontColor("white");
+    var roleData = CONFIG.DEFAULT_ROLES.map(function(r) { return [r]; });
+    rolesSheet.getRange(2, 1, roleData.length, 1).setValues(roleData);
+    rolesSheet.autoResizeColumns(1, 1);
+  }
+  
+  updateStudentValidation();
   SpreadsheetApp.getUi().alert("Setup Complete", "23-column Classes sheet + Students database ready.", SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
@@ -726,6 +750,64 @@ function addNewClass(classData) {
   return { success: true, row: newRow };
 }
 
+function getRoles() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.ROLES_SHEET);
+  
+  if (!sheet) {
+    Logger.log("WARNING: Roles sheet '" + CONFIG.ROLES_SHEET + "' not found. Using defaults.");
+    return CONFIG.DEFAULT_ROLES;
+  }
+  
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    Logger.log("WARNING: Roles sheet exists but is empty. Using defaults.");
+    return CONFIG.DEFAULT_ROLES;
+  }
+  
+  var data = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  var roles = data.filter(function(r) { return r[0]; }).map(function(r) { return r[0].toString().trim(); });
+  
+  Logger.log("Loaded roles: " + roles.join(", "));
+  return roles.length > 0 ? roles : CONFIG.DEFAULT_ROLES;
+}
+
+function updateStudentValidation() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.STUDENTS_SHEET);
+  var roles = getRoles();
+  if (roles.length > 0 && sheet) {
+    sheet.getRange("C2:C").setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(roles, true).build()
+    );
+  }
+}
+
+function addRole(roleName) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.ROLES_SHEET);
+  var lastRow = sheet.getLastRow();
+  sheet.getRange(lastRow + 1, 1).setValue(roleName);
+  updateStudentValidation();
+  return { success: true, row: lastRow + 1 };
+}
+
+function deleteRole(rowNum) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.ROLES_SHEET);
+  sheet.deleteRow(rowNum);
+  updateStudentValidation();
+  return { success: true };
+}
+
+function updateRole(rowNum, roleName) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.ROLES_SHEET);
+  sheet.getRange(rowNum, 1).setValue(roleName);
+  updateStudentValidation();
+  return { success: true };
+}
+
 function quickSync(seasonStartStr) {
   PropertiesService.getDocumentProperties().setProperty('seasonStart', seasonStartStr);
   
@@ -1002,7 +1084,8 @@ function getWebAppData() {
     studios: studios,
     studioColors: studioColors,
     seasonStart: props.getProperty('seasonStart') || "",
-    students: getStudents()
+    students: getStudents(),
+    roles: getRoles()
   };
 }
 
