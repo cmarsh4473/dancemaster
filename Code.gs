@@ -10,7 +10,7 @@ var CONFIG = {
   STUDIO_CONFIG_SHEET: "Studio Config",
   INSTRUCTORS_SHEET: "Instructors",
   STUDENTS_SHEET: "Students",
-  RECURRENCE_YEARS: 10,
+  RECURRENCE_YEARS: 1,
   IGNORE_PATTERN: /\bLevel\s*[4-7]\b/i,
   DEFAULT_ROLES: ["Snowflakes", "Rat King", "Party People", "Mother Ginger", "Other"],
   
@@ -349,7 +349,10 @@ function computeEventHash(row, timeSlots) {
     row[COL.STUDIO] || "",
     extractClassTitle(row[COL.NAME]),
     row[COL.INSTRUCTOR_EMAIL] || "",
-    row[COL.STUDENTS] || ""
+    row[COL.STUDENTS] || "",
+    (row[COL.DAY] || "").toString(),
+    (row[COL.START_TIME] || "").toString(),
+    (row[COL.LENGTH] || "").toString()
   ];
   for (var i = 0; i < timeSlots.length; i++) {
     var t = timeSlots[i];
@@ -494,9 +497,17 @@ function parseClassTimes(row) {
   var csvDay = row[COL.DAY];
   var csvStartTime = row[COL.START_TIME];
   var csvLength = row[COL.LENGTH];
+  
+  // PREFER explicit CSV columns (Day, Start Time, Length)
+  // These are what the web app edits directly
+  var fromCSV = parseTimesFromCSV(csvDay, csvStartTime, csvLength);
+  if (fromCSV && fromCSV.length > 0) return fromCSV;
+  
+  // Fallback: parse from the class name
   var fromName = parseTimesFromName(name, csvStartTime);
   if (fromName && fromName.length > 0) return fromName;
-  return parseTimesFromCSV(csvDay, csvStartTime, csvLength);
+  
+  return null;
 }
 
 function parseTimesFromName(name, csvStartTime) {
