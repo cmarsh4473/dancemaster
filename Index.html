@@ -113,6 +113,12 @@
     .student-select-multi { width: 100%; min-height: 80px; border: 1px solid var(--gray-200); border-radius: 8px; padding: 8px; font-size: 13px; font-family: inherit; outline: none; }
     .student-select-multi:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
     .student-tag { display: inline-flex; align-items: center; gap: 4px; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; margin: 2px; }
+    .attendee-chip { display:inline-flex; align-items:center; gap:6px; background:#e0e7ff; color:#3730a3; padding:6px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .chip-remove { background:rgba(55,48,163,0.12); color:#3730a3; border:none; width:18px; height:18px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:11px; padding:0; line-height:1; transition:background 0.15s; }
+    .chip-remove:hover { background:rgba(55,48,163,0.25); }
+    .student-result-row { padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--gray-100); display:flex; align-items:center; justify-content:space-between; transition:background 0.1s; }
+    .student-result-row:hover { background:var(--gray-50); }
+    .student-result-row:last-child { border-bottom:none; }
     /* Calendar */
     .calendar-container { padding: 0 24px 24px; display: none; }
     .calendar-container.show { display: block; }
@@ -509,6 +515,110 @@ function formatDateShort(date) {
   return (date.getMonth() + 1) + '/' + date.getDate();
 }
 
+function getStudentNameByEmail(email) {
+  if (!allData.students) return email;
+  var s = allData.students.find(function(st) { return st.email === email; });
+  return s ? s.name : email;
+}
+
+function getPanelAttendees(rowNum) {
+  var dirty = dirtyRows.get(rowNum);
+  var cls = allData.classes.find(c => c.rowNum === rowNum);
+  if (dirty && dirty.students) return dirty.students.slice();
+  return cls && cls.students ? cls.students.slice() : [];
+}
+
+function renderPanelAttendees(rowNum, list) {
+  var container = document.getElementById('panelAttendingList');
+  var countEl = document.getElementById('panelAttendeeCount');
+  if (!container) return;
+  
+  if (list.length === 0) {
+    container.innerHTML = '<span style="color:#9ca3af;font-size:13px;">No students assigned. Search below to add.</span>';
+  } else {
+    container.innerHTML = list.map(function(email) {
+      return '<div class="attendee-chip" data-email="' + escapeHtml(email) + '">' +
+        '<span>' + escapeHtml(getStudentNameByEmail(email)) + '</span>' +
+        '<button type="button" class="chip-remove" onclick="removeAttendee(' + rowNum + ', \'' + escapeHtml(email) + '\')" title="Remove">✕</button>' +
+      '</div>';
+    }).join('');
+  }
+  if (countEl) countEl.textContent = list.length + ' student' + (list.length !== 1 ? 's' : '');
+}
+
+function removeAttendee(rowNum, email) {
+  var list = getPanelAttendees(rowNum);
+  var idx = list.indexOf(email);
+  if (idx !== -1) {
+    list.splice(idx, 1);
+    queueChange(rowNum, 'students', list);
+    renderPanelAttendees(rowNum, list);
+    // Re-run search in case they want to re-add
+    filterPanelStudents(rowNum);
+  }
+}
+
+function filterPanelStudents(rowNum) {
+  var input = document.getElementById('panelStudentSearch');
+  var resultsBox = document.getElementById('panelStudentResults');
+  if (!input || !resultsBox) return;
+  
+  var query = input.value.toLowerCase().trim();
+  var currentList = getPanelAttendees(rowNum);
+  var attendingSet = new Set(currentList);
+  
+  if (!query) {
+    resultsBox.style.display = 'none';
+    resultsBox.innerHTML = '';
+    return;
+  }
+  
+  var matches = [];
+  if (allData.students) {
+    matches = allData.students.filter(function(s) {
+      return !attendingSet.has(s.email) &&
+        (s.name.toLowerCase().includes(query) || s.email.toLowerCase().includes(query));
+    });
+  }
+  
+  if (matches.length === 0) {
+    resultsBox.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:13px;">No students found</div>';
+  } else {
+    resultsBox.innerHTML = matches.map(function(s) {
+      return '<div class="student-result-row" onclick="addPanelStudent(' + rowNum + ', \'' + escapeHtml(s.email) + '\')">' +
+        '<div>' +
+          '<div style="font-size:13px;font-weight:600;color:var(--gray-900);">' + escapeHtml(s.name) + '</div>' +
+          '<div style="font-size:12px;color:var(--gray-500);">' + escapeHtml(s.email) + ' • ' + escapeHtml(s.role || 'Dancer') + '</div>' +
+        '</div>' +
+        '<span style="font-size:18px;color:var(--primary);font-weight:700;">+</span>' +
+      '</div>';
+    }).join('');
+  }
+  resultsBox.style.display = 'block';
+}
+
+function addPanelStudent(rowNum, email) {
+  var list = getPanelAttendees(rowNum);
+  if (list.indexOf(email) === -1) {
+    list.push(email);
+    queueChange(rowNum, 'students', list);
+    renderPanelAttendees(rowNum, list);
+  }
+  // Clear search
+  var input = document.getElementById('panelStudentSearch');
+  if (input) input.value = '';
+  filterPanelStudents(rowNum);
+}
+
+// Close student search dropdown when clicking outside the panel's student section
+document.addEventListener('click', function(e) {
+  var results = document.getElementById('panelStudentResults');
+  var searchWrap = document.getElementById('panelStudentSearch');
+  if (results && searchWrap && !searchWrap.contains(e.target) && !results.contains(e.target)) {
+    results.style.display = 'none';
+  }
+});
+
 function updateWeekRange() {
   const start = getWeekStart(currentWeekOffset);
   const end = new Date(start);
@@ -863,63 +973,87 @@ function switchView(view) {
   
   // ===== INLINE EDIT PANEL =====
   function openEditPanel(rowNum) {
-    editingRowNum = rowNum;
-    var cls = allData.classes.find(c => c.rowNum === rowNum);
-    if (!cls) return;
-    
-    var dirty = dirtyRows.get(rowNum) || {};
-    var studio = dirty.studio !== undefined ? dirty.studio : cls.studio;
-    var email = dirty.instructorEmail !== undefined ? dirty.instructorEmail : cls.instructorEmail;
-    var status = dirty.status !== undefined ? dirty.status : cls.status;
-    var studentList = dirty ? (dirty.students || []) : (cls.students || []);
-    
-    var body = document.getElementById('editPanelBody');
-    body.innerHTML = `
-      <div class="edit-field">
-        <label>Class</label>
-        <div class="value">${escapeHtml(cls.title)}</div>
-      </div>
-      <div class="edit-field">
-        <label>Schedule</label>
-        <div class="value">${escapeHtml(cls.day)} &bull; ${escapeHtml(cls.startTime)} &bull; ${escapeHtml(cls.length)}</div>
-      </div>
-      <div class="edit-field">
-        <label>Location</label>
-        <div class="value">${escapeHtml(cls.location)}</div>
-      </div>
-      <div class="edit-field">
-        <label>Studio</label>
-        <select id="panelStudio">
-          <option value="">— Select —</option>
-          ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
-        </select>
-      </div>
-      <div class="edit-field">
-        <label>Instructor Email</label>
-        <input type="email" id="panelEmail" value="${escapeHtml(email)}" placeholder="instructor@email.com">
-      </div>
-      <div class="edit-field">
-        <label>Status</label>
-        <select id="panelStatus">
-          <option value="Active" ${status==='Active'?'selected':''}>Active</option>
-          <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
-        </select>
-      </div>
-      <div class="edit-field">
-        <label>Students (${allData.students ? allData.students.length : 0} in database)</label>
-        <select class="student-select-multi" id="panelStudents" multiple>
-          ${allData.students ? allData.students.map(s => {
-            var selected = (studentList.indexOf(s.email) !== -1) ? 'selected' : '';
-            return '<option value="' + escapeHtml(s.email) + '" ' + selected + '>' + escapeHtml(s.name) + ' (' + escapeHtml(s.email) + ')</option>';
-          }).join('') : ''}
-        </select>
-        <div class="hint">Hold Ctrl/Cmd to select multiple. Students will be invited to calendar events.</div>
-      </div>
-    `;
-    
-    document.getElementById('editPanelOverlay').classList.add('show');
-    document.getElementById('editPanel').classList.add('show');
+  editingRowNum = rowNum;
+  var cls = allData.classes.find(c => c.rowNum === rowNum);
+  if (!cls) return;
+  
+  var dirty = dirtyRows.get(rowNum) || {};
+  var studio = dirty.studio !== undefined ? dirty.studio : cls.studio;
+  var email = dirty.instructorEmail !== undefined ? dirty.instructorEmail : cls.instructorEmail;
+  var status = dirty.status !== undefined ? dirty.status : cls.status;
+  var studentList = dirty ? (dirty.students || cls.students || []) : (cls.students || []);
+  
+  // Build attending chips HTML
+  var attendingHtml = '';
+  if (studentList.length === 0) {
+    attendingHtml = '<span style="color:#9ca3af;font-size:13px;">No students assigned. Search below to add.</span>';
+  } else {
+    attendingHtml = studentList.map(function(s, idx) {
+      return '<div class="attendee-chip" data-email="' + escapeHtml(s) + '">' +
+        '<span>' + escapeHtml(getStudentNameByEmail(s)) + '</span>' +
+        '<button type="button" class="chip-remove" onclick="removeAttendee(' + rowNum + ', \'' + escapeHtml(s) + '\')" title="Remove">✕</button>' +
+      '</div>';
+    }).join('');
   }
+  
+  var body = document.getElementById('editPanelBody');
+  body.innerHTML = `
+    <div class="edit-field">
+      <label>Class</label>
+      <div class="value">${escapeHtml(cls.title)}</div>
+    </div>
+    <div class="edit-field">
+      <label>Schedule</label>
+      <div class="value">${escapeHtml(cls.day)} &bull; ${escapeHtml(cls.startTime)} &bull; ${escapeHtml(cls.length)}</div>
+    </div>
+    <div class="edit-field">
+      <label>Location</label>
+      <div class="value">${escapeHtml(cls.location)}</div>
+    </div>
+    <div class="edit-field">
+      <label>Studio</label>
+      <select id="panelStudio">
+        <option value="">— Select —</option>
+        ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="edit-field">
+      <label>Instructor Email</label>
+      <input type="email" id="panelEmail" value="${escapeHtml(email)}" placeholder="instructor@email.com">
+    </div>
+    
+    <!-- NEW: Attending Section -->
+    <div class="edit-field">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label>Attending</label>
+        <span id="panelAttendeeCount" style="font-size:12px;color:var(--gray-500);font-weight:500;">${studentList.length} student${studentList.length!==1?'s':''}</span>
+      </div>
+      <div id="panelAttendingList" style="display:flex;flex-wrap:wrap;gap:8px;min-height:44px;padding:12px;border:1px solid var(--gray-200);border-radius:10px;background:var(--gray-50);margin-bottom:10px;">
+        ${attendingHtml}
+      </div>
+      
+      <label style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:block;">Add Student</label>
+      <div style="position:relative;">
+        <input type="text" id="panelStudentSearch" placeholder="Search by name or email..." oninput="filterPanelStudents(${rowNum})" 
+          style="width:100%;border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px 10px 36px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:0.4;font-size:12px;">🔍</span>
+      </div>
+      <div id="panelStudentResults" style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;max-height:200px;overflow-y:auto;background:#fff;display:none;margin-top:4px;"></div>
+    </div>
+    <!-- END NEW -->
+    
+    <div class="edit-field">
+      <label>Status</label>
+      <select id="panelStatus">
+        <option value="Active" ${status==='Active'?'selected':''}>Active</option>
+        <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
+      </select>
+    </div>
+  `;
+  
+  document.getElementById('editPanelOverlay').classList.add('show');
+  document.getElementById('editPanel').classList.add('show');
+}
   
   function closeEditPanel() {
     document.getElementById('editPanelOverlay').classList.remove('show');
@@ -929,25 +1063,18 @@ function switchView(view) {
   
   function saveEditPanel() {
     if (!editingRowNum) return;
-    var studio = document.getElementById('panelStudio').value;
-    var email = document.getElementById('panelEmail').value.trim();
-    var status = document.getElementById('panelStatus').value;
-    
-    var studentSelect = document.getElementById('panelStudents');
-    var selectedStudents = [];
-    if (studentSelect) {
-      for (var i = 0; i < studentSelect.options.length; i++) {
-        if (studentSelect.options[i].selected) selectedStudents.push(studentSelect.options[i].value);
-      }
-  }
-  
-  queueChange(editingRowNum, 'studio', studio);
-  queueChange(editingRowNum, 'instructorEmail', email);
-  queueChange(editingRowNum, 'status', status);
-  queueChange(editingRowNum, 'students', selectedStudents);
-  
-  closeEditPanel();
-  showToast('Changes queued. Click Save Changes to apply.', 'success');
+      var studio = document.getElementById('panelStudio').value;
+      var email = document.getElementById('panelEmail').value.trim();
+      var status = document.getElementById('panelStatus').value;
+      var students = getPanelAttendees(editingRowNum);
+      
+      queueChange(editingRowNum, 'studio', studio);
+      queueChange(editingRowNum, 'instructorEmail', email);
+      queueChange(editingRowNum, 'status', status);
+      queueChange(editingRowNum, 'students', students);
+      
+      closeEditPanel();
+      showToast('Changes queued. Click Save Changes to apply.', 'success');
 }
   
   function deleteFromPanel() {
@@ -962,18 +1089,19 @@ function switchView(view) {
   function queueChange(rowNum, field, value) {
   if (!dirtyRows.has(rowNum)) {
     var original = allData.classes.find(c => c.rowNum === rowNum);
+    var origStudents = original.students ? original.students.slice() : [];
     dirtyRows.set(rowNum, { 
       row: rowNum, 
       studio: original.studio, 
       instructorEmail: original.instructorEmail, 
       status: original.status,
-      students: original.students || []
+      students: origStudents
     });
   }
-  dirtyRows.get(rowNum)[field] = value;
-  filterAndRenderList();
-  if (currentView === 'calendar') renderCalendar();
-  updateSaveBar();
+    dirtyRows.get(rowNum)[field] = value;
+    filterAndRenderList();
+    if (currentView === 'calendar') renderCalendar();
+    updateSaveBar();
 }
   
   function updateSaveBar() {
