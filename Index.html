@@ -500,7 +500,20 @@
     var brightness = (r * 299 + g * 587 + b * 114) / 1000;
     return brightness < 140;
   }
-  
+
+  function studioMatchesFilter(classStudio, filterValue) {
+    if (!filterValue) return true;
+    if (filterValue === '__CHARLOTTE__') {
+      var charlotteStudios = allData.studios.filter(s => s.location === 'Charlotte').map(s => s.name);
+      return charlotteStudios.includes(classStudio);
+    }
+    if (filterValue === '__CONCORD__') {
+      var concordStudios = allData.studios.filter(s => s.location === 'Concord').map(s => s.name);
+      return concordStudios.includes(classStudio);
+    }
+    return classStudio === filterValue;
+}
+
   function showToast(message, type) {
     const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
@@ -765,13 +778,32 @@ function goToToday() {
       allData = data;
       document.getElementById('seasonStart').value = data.seasonStart || '';
       
-      const sf = document.getElementById('studioFilter');
+            const sf = document.getElementById('studioFilter');
       sf.innerHTML = '<option value="">All Studios</option>';
+      
+      // Individual studios
       data.studios.forEach(s => {
         const opt = document.createElement('option');
-        opt.value = s.name; opt.textContent = s.name;
+        opt.value = s.name;
+        opt.textContent = s.name;
         sf.appendChild(opt);
       });
+      
+      // Location group filters
+      const groupOpt = document.createElement('option');
+      groupOpt.disabled = true;
+      groupOpt.textContent = '──────────';
+      sf.appendChild(groupOpt);
+      
+      const charlotteOpt = document.createElement('option');
+      charlotteOpt.value = '__CHARLOTTE__';
+      charlotteOpt.textContent = 'All Charlotte Locations';
+      sf.appendChild(charlotteOpt);
+      
+      const concordOpt = document.createElement('option');
+      concordOpt.value = '__CONCORD__';
+      concordOpt.textContent = 'All Concord Locations';
+      sf.appendChild(concordOpt);
       
       updateNewStudioOptions();
       applyFilters();
@@ -871,7 +903,7 @@ function switchView(view) {
   
   const filtered = allData.classes.filter(c => {
     if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return false;
-    if (studioF && c.studio !== studioF) return false;
+    if (studioF && !studioMatchesFilter(c.studio, studioF)) return false;
     if (statusF && c.status !== statusF) return false;
     if (dayF && !c.day.includes(dayF.substring(0,2)) && !c.day.includes(dayF)) return false;
     return true;
@@ -977,7 +1009,7 @@ function switchView(view) {
     allData.classes.forEach(function(c) {
       if (c.status === 'Deleted') return;
       if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return;
-      if (studioF && c.studio !== studioF) return;
+      if (studioF && !studioMatchesFilter(c.studio, studioF)) return;
       if (statusF && c.status !== statusF) return;
       
       var days = expandDays(c.day);
