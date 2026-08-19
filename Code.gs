@@ -1117,6 +1117,9 @@ function webSaveChanges(updates) {
   var classesSheet = ss.getSheetByName(CONFIG.CLASSES_SHEET);
   for (var i = 0; i < updates.length; i++) {
     var up = updates[i];
+    if (up.day !== undefined) classesSheet.getRange(up.row, COL.DAY + 1).setValue(up.day);
+    if (up.startTime !== undefined) classesSheet.getRange(up.row, COL.START_TIME + 1).setValue(up.startTime);
+    if (up.length !== undefined) classesSheet.getRange(up.row, COL.LENGTH + 1).setValue(up.length);
     classesSheet.getRange(up.row, COL.STUDIO + 1).setValue(up.studio);
     classesSheet.getRange(up.row, COL.INSTRUCTOR_EMAIL + 1).setValue(up.instructorEmail);
     classesSheet.getRange(up.row, COL.STATUS + 1).setValue(up.status);

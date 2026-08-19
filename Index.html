@@ -864,60 +864,63 @@ function switchView(view) {
 }
   // ===== LIST VIEW =====
   function filterAndRenderList() {
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    const studioF = document.getElementById('studioFilter').value;
-    const statusF = document.getElementById('statusFilter').value;
-    const dayF = document.getElementById('dayFilter').value;
-    
-    const filtered = allData.classes.filter(c => {
-      if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return false;
-      if (studioF && c.studio !== studioF) return false;
-      if (statusF && c.status !== statusF) return false;
-      if (dayF && !c.day.includes(dayF.substring(0,2)) && !c.day.includes(dayF)) return false;
-      return true;
-    });
-    
-    const tbody = document.getElementById('tableBody');
-    if (filtered.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">📭</div><div>No classes match your filters</div></td></tr>';
-      return;
-    }
-    
-    let html = '';
-    filtered.forEach(c => {
-      const dirty = dirtyRows.get(c.rowNum);
-      const studio = dirty ? dirty.studio : c.studio;
-      const email = dirty ? dirty.instructorEmail : c.instructorEmail;
-      const status = dirty ? dirty.status : c.status;
-      const isDeleted = status === 'Deleted';
-      
-      html += `<tr class="${dirty?'dirty':''} ${isDeleted?'deleted':''}" data-row="${c.rowNum}">
-        <td>
-          <div class="cell-title" title="${escapeHtml(c.name)}">${escapeHtml(c.title)}</div>
-          <div class="cell-sub">${escapeHtml(c.location)} &bull; Max ${c.maxSize || 'N/A'}</div>
-          ${c.errorLog ? '<div class="error-badge" title="'+escapeHtml(c.errorLog)+'">⚠️ Error</div>' : ''}
-          ${c.students && c.students.length > 0 ? '<div class="student-count-badge">👤 ' + c.students.length + ' student' + (c.students.length > 1 ? 's' : '') + '</div>' : ''}
-        </td>
-        <td class="cell-time">${escapeHtml(c.day)}<br><span>${escapeHtml(c.startTime)} &bull; ${escapeHtml(c.length)}</span></td>
-        <td>
-          <select class="studio-select" onchange="queueChange(${c.rowNum}, 'studio', this.value)">
-            <option value="">— Select —</option>
-            ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
-          </select>
-        </td>
-        <td><input type="email" class="email-input" value="${escapeHtml(email)}" placeholder="No email" onchange="queueChange(${c.rowNum}, 'instructorEmail', this.value)"></td>
-        <td>
-          <select class="status-select" onchange="queueChange(${c.rowNum}, 'status', this.value)">
-            <option value="Active" ${status==='Active'?'selected':''}>Active</option>
-            <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
-          </select>
-          <span class="status-pill ${status==='Active'?'status-active':status==='Deleted'?'status-deleted':'status-unassigned'}">${status || 'Active'}</span>
-        </td>
-        <td><button class="action-btn" onclick="removeClass(${c.rowNum})" title="Remove class">🗑️</button></td>
-      </tr>`;
-    });
-    tbody.innerHTML = html;
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const studioF = document.getElementById('studioFilter').value;
+  const statusF = document.getElementById('statusFilter').value;
+  const dayF = document.getElementById('dayFilter').value;
+  
+  const filtered = allData.classes.filter(c => {
+    if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return false;
+    if (studioF && c.studio !== studioF) return false;
+    if (statusF && c.status !== statusF) return false;
+    if (dayF && !c.day.includes(dayF.substring(0,2)) && !c.day.includes(dayF)) return false;
+    return true;
+  });
+  
+  const tbody = document.getElementById('tableBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">📭</div><div>No classes match your filters</div></td></tr>';
+    return;
   }
+  
+  let html = '';
+  filtered.forEach(c => {
+    const dirty = dirtyRows.get(c.rowNum);
+    const studio = dirty ? dirty.studio : c.studio;
+    const email = dirty ? dirty.instructorEmail : c.instructorEmail;
+    const status = dirty ? dirty.status : c.status;
+    const isDeleted = status === 'Deleted';
+    
+    html += `<tr class="${dirty?'dirty':''} ${isDeleted?'deleted':''}" data-row="${c.rowNum}">
+      <td>
+        <div class="cell-title" title="${escapeHtml(c.name)}">${escapeHtml(c.title)}</div>
+        <div class="cell-sub">${escapeHtml(c.location)} &bull; Max ${c.maxSize || 'N/A'}</div>
+        ${c.errorLog ? '<div class="error-badge" title="'+escapeHtml(c.errorLog)+'">⚠️ Error</div>' : ''}
+        ${c.students && c.students.length > 0 ? '<div class="student-count-badge">👤 ' + c.students.length + ' student' + (c.students.length > 1 ? 's' : '') + '</div>' : ''}
+      </td>
+      <td class="cell-time">${escapeHtml(c.day)}<br><span>${escapeHtml(c.startTime)} &bull; ${escapeHtml(c.length)}</span></td>
+      <td>
+        <select class="studio-select" onchange="queueChange(${c.rowNum}, 'studio', this.value)">
+          <option value="">— Select —</option>
+          ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="email" class="email-input" value="${escapeHtml(email)}" placeholder="No email" onchange="queueChange(${c.rowNum}, 'instructorEmail', this.value)"></td>
+      <td>
+        <select class="status-select" onchange="queueChange(${c.rowNum}, 'status', this.value)">
+          <option value="Active" ${status==='Active'?'selected':''}>Active</option>
+          <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
+        </select>
+        <span class="status-pill ${status==='Active'?'status-active':status==='Deleted'?'status-deleted':'status-unassigned'}">${status || 'Active'}</span>
+      </td>
+      <td>
+        <button class="action-btn" onclick="openEditPanel(${c.rowNum})" title="Edit class">✏️</button>
+        <button class="action-btn" onclick="removeClass(${c.rowNum})" title="Remove class">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
   
   // ===== CALENDAR VIEW =====
   function renderCalendar() {
@@ -1085,7 +1088,7 @@ function switchView(view) {
   }
   
   // ===== INLINE EDIT PANEL =====
-  function openEditPanel(rowNum) {
+ function openEditPanel(rowNum) {
   editingRowNum = rowNum;
   var cls = allData.classes.find(c => c.rowNum === rowNum);
   if (!cls) return;
@@ -1096,7 +1099,11 @@ function switchView(view) {
   var status = dirty.status !== undefined ? dirty.status : cls.status;
   var studentList = dirty ? (dirty.students || cls.students || []) : (cls.students || []);
   
-  var roles = allData.roles || CONFIG.DEFAULT_ROLES;
+  var day = dirty.day !== undefined ? dirty.day : cls.day;
+  var startTime = dirty.startTime !== undefined ? dirty.startTime : cls.startTime;
+  var length = dirty.length !== undefined ? dirty.length : cls.length;
+  
+  var roles = allData.roles || [];
   
   var attendingHtml = '';
   if (studentList.length === 0) {
@@ -1110,15 +1117,6 @@ function switchView(view) {
     }).join('');
   }
   
-  var bulkAddHtml = '';
-  if (roles.length > 0) {
-      bulkAddHtml = roles.map(function(r) {
-      return '<button type="button" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="bulkAddByRole(' + rowNum + ', \'' + r.replace(/'/g, "\\'") + '\')">+' + escapeHtml(r) + '</button>';
-    }).join('');
-  } else {
-    bulkAddHtml = '<span style="font-size:12px;color:#9ca3af;">No roles configured</span>';
-  }
-  
   var body = document.getElementById('editPanelBody');
   body.innerHTML = `
     <div class="edit-field">
@@ -1126,9 +1124,33 @@ function switchView(view) {
       <div class="value">${escapeHtml(cls.title)}</div>
     </div>
     <div class="edit-field">
-      <label>Schedule</label>
+      <label>Current Schedule</label>
       <div class="value">${escapeHtml(cls.day)} &bull; ${escapeHtml(cls.startTime)} &bull; ${escapeHtml(cls.length)}</div>
     </div>
+    
+    <div class="edit-field">
+      <label>Day</label>
+      <select id="panelDay">
+        <option value="Monday" ${day==='Monday'?'selected':''}>Monday</option>
+        <option value="Tuesday" ${day==='Tuesday'?'selected':''}>Tuesday</option>
+        <option value="Wednesday" ${day==='Wednesday'?'selected':''}>Wednesday</option>
+        <option value="Thursday" ${day==='Thursday'?'selected':''}>Thursday</option>
+        <option value="Friday" ${day==='Friday'?'selected':''}>Friday</option>
+        <option value="Saturday" ${day==='Saturday'?'selected':''}>Saturday</option>
+        <option value="MW" ${day==='MW'?'selected':''}>MW</option>
+        <option value="TuTh" ${day==='TuTh'?'selected':''}>TuTh</option>
+        <option value="TuWTh" ${day==='TuWTh'?'selected':''}>TuWTh</option>
+      </select>
+    </div>
+    <div class="edit-field">
+      <label>Start Time</label>
+      <input type="text" id="panelStartTime" value="${escapeHtml(startTime)}" placeholder="5:15 PM">
+    </div>
+    <div class="edit-field">
+      <label>Length</label>
+      <input type="text" id="panelLength" value="${escapeHtml(length)}" placeholder="0:45">
+    </div>
+    
     <div class="edit-field">
       <label>Location</label>
       <div class="value">${escapeHtml(cls.location)}</div>
@@ -1192,20 +1214,39 @@ function switchView(view) {
     editingRowNum = null;
   }
   
-  function saveEditPanel() {
-    if (!editingRowNum) return;
-      var studio = document.getElementById('panelStudio').value;
-      var email = document.getElementById('panelEmail').value.trim();
-      var status = document.getElementById('panelStatus').value;
-      var students = getPanelAttendees(editingRowNum);
-      
-      queueChange(editingRowNum, 'studio', studio);
-      queueChange(editingRowNum, 'instructorEmail', email);
-      queueChange(editingRowNum, 'status', status);
-      queueChange(editingRowNum, 'students', students);
-      
-      closeEditPanel();
-      showToast('Changes queued. Click Save Changes to apply.', 'success');
+function saveEditPanel() {
+  if (!editingRowNum) return;
+  
+  var studio = document.getElementById('panelStudio').value;
+  var email = document.getElementById('panelEmail').value.trim();
+  var status = document.getElementById('panelStatus').value;
+  var day = document.getElementById('panelDay').value;
+  var startTime = document.getElementById('panelStartTime').value.trim();
+  var length = document.getElementById('panelLength').value.trim();
+  var students = getPanelAttendees(editingRowNum);
+  
+  // Validate time format
+  if (startTime && !/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(startTime)) {
+    showToast('Start Time must be like "5:15 PM"', 'warning');
+    document.getElementById('panelStartTime').focus();
+    return;
+  }
+  if (length && !/^\d{1,2}:\d{2}$/.test(length)) {
+    showToast('Length must be like "0:45"', 'warning');
+    document.getElementById('panelLength').focus();
+    return;
+  }
+  
+  queueChange(editingRowNum, 'day', day);
+  queueChange(editingRowNum, 'startTime', startTime);
+  queueChange(editingRowNum, 'length', length);
+  queueChange(editingRowNum, 'studio', studio);
+  queueChange(editingRowNum, 'instructorEmail', email);
+  queueChange(editingRowNum, 'status', status);
+  queueChange(editingRowNum, 'students', students);
+  
+  closeEditPanel();
+  showToast('Changes queued. Click Save Changes to apply.', 'success');
 }
   
   function deleteFromPanel() {
@@ -1223,16 +1264,19 @@ function switchView(view) {
     var origStudents = original.students ? original.students.slice() : [];
     dirtyRows.set(rowNum, { 
       row: rowNum, 
+      day: original.day,
+      startTime: original.startTime,
+      length: original.length,
       studio: original.studio, 
       instructorEmail: original.instructorEmail, 
       status: original.status,
       students: origStudents
     });
   }
-    dirtyRows.get(rowNum)[field] = value;
-    filterAndRenderList();
-    if (currentView === 'calendar') renderCalendar();
-    updateSaveBar();
+  dirtyRows.get(rowNum)[field] = value;
+  filterAndRenderList();
+  if (currentView === 'calendar') renderCalendar();
+  updateSaveBar();
 }
   
   function updateSaveBar() {
