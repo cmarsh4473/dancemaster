@@ -106,6 +106,13 @@
     
     .error-badge { display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: help; }
     
+    /* Students View */
+    .students-container { padding: 0 24px 24px; display: none; }
+    .students-container.show { display: block; }
+    .student-count-badge { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .student-select-multi { width: 100%; min-height: 80px; border: 1px solid var(--gray-200); border-radius: 8px; padding: 8px; font-size: 13px; font-family: inherit; outline: none; }
+    .student-select-multi:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+    .student-tag { display: inline-flex; align-items: center; gap: 4px; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; margin: 2px; }
     /* Calendar */
     .calendar-container { padding: 0 24px 24px; display: none; }
     .calendar-container.show { display: block; }
@@ -131,6 +138,10 @@
     
     .empty-state { text-align: center; padding: 60px 20px; color: var(--gray-500); }
     .empty-state-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+
+    .week-nav { padding: 0 24px 12px; display: none; align-items: center; gap: 12px; }
+    .week-nav.show { display: flex; }
+    .week-range { font-size: 14px; font-weight: 600; color: var(--gray-700); min-width: 180px; text-align: center; }
     
     /* Inline Edit Panel (slides out from right) */
     .edit-panel-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 250; }
@@ -215,14 +226,15 @@
     <span>Dance Studio Manager</span>
   </div>
   <div class="header-actions">
-    <div class="season-wrap">
-      <label>Season Start</label>
-      <input type="text" class="season-input" id="seasonStart" placeholder="MM/DD/YYYY">
-    </div>
-    <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh</button>
-    <button class="btn btn-success" onclick="runSync()" id="syncBtn">⚡ Sync to Calendar</button>
-    <button class="btn btn-primary" onclick="openModal()">➕ Add Class</button>
+  <div class="season-wrap">
+    <label>Season Start</label>
+    <input type="text" class="season-input" id="seasonStart" placeholder="MM/DD/YYYY">
   </div>
+  <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh</button>
+  <button class="btn btn-success" onclick="runSync()" id="syncBtn">⚡ Sync</button>
+  <button class="btn btn-primary" id="addClassBtn" onclick="openModal()">➕ Add Class</button>
+  <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()" style="display:none;">➕ Add Student</button>
+</div>
 </header>
 
 <!-- Stats -->
@@ -250,8 +262,16 @@
 
 <!-- View Toggle -->
 <div class="view-toggle">
-  <button class="view-btn active" id="listViewBtn" onclick="switchView('list')">📋 List View</button>
-  <button class="view-btn" id="calViewBtn" onclick="switchView('calendar')">📅 Calendar View</button>
+  <button class="view-btn active" id="listViewBtn" onclick="switchView('list')">📋 List</button>
+  <button class="view-btn" id="calViewBtn" onclick="switchView('calendar')">📅 Calendar</button>
+  <button class="view-btn" id="studentsViewBtn" onclick="switchView('students')">👥 Students</button>
+</div>
+
+<div class="week-nav" id="weekNav">
+  <button class="btn btn-secondary" onclick="prevWeek()">← Prev</button>
+  <span class="week-range" id="weekRange">...</span>
+  <button class="btn btn-secondary" onclick="nextWeek()">Next →</button>
+  <button class="btn btn-secondary" onclick="goToToday()">Today</button>
 </div>
 
 <!-- List View -->
@@ -296,6 +316,26 @@
       <div class="cal-day-col" id="calDay4"></div>
       <div class="cal-day-col" id="calDay5"></div>
     </div>
+  </div>
+</div>
+
+<!-- Students View -->
+<div class="students-container" id="studentsContainer">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Notes</th>
+          <th style="width:100px"></th>
+        </tr>
+      </thead>
+      <tbody id="studentsTableBody">
+        <tr><td colspan="5" class="empty-state"><div class="empty-state-icon">👥</div><div>Loading students...</div></td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -379,12 +419,49 @@
   </div>
 </div>
 
+<!-- Student Modal -->
+<div class="modal-overlay" id="studentModalOverlay" onclick="if(event.target===this)closeStudentModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="studentModalTitle">Add Student</h2>
+      <button class="modal-close" onclick="closeStudentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Full Name *</label>
+          <input class="form-input" id="studentName" placeholder="Jane Doe">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Email *</label>
+          <input class="form-input" id="studentEmail" type="email" placeholder="jane@email.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select class="form-select" id="studentRole">
+            <option>Dancer</option><option>Parent</option><option>Instructor</option><option>Admin</option><option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <input class="form-input" id="studentNotes" placeholder="Optional">
+        </div>
+        <div class="form-group full">
+          <button class="btn btn-primary" id="studentSubmitBtn" onclick="submitStudent()" style="width:100%; justify-content:center; padding:12px;">Save Student</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
   let allData = { classes: [], studios: [], studioColors: {}, seasonStart: "" };
   let dirtyRows = new Map();
   let isLoading = false;
   let currentView = 'list';
+  let currentWeekOffset = 0;
   let editingRowNum = null;
+  let editingStudentRow = null;
   
   const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat'];
   const FULL_DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -418,41 +495,87 @@
     return div.innerHTML;
   }
   
+  function getWeekStart(offset) {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun, 1=Mon...
+  const monday = new Date(now);
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1) + (offset * 7);
+  monday.setDate(diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function formatDateShort(date) {
+  return (date.getMonth() + 1) + '/' + date.getDate();
+}
+
+function updateWeekRange() {
+  const start = getWeekStart(currentWeekOffset);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 5);
+  const year = start.getFullYear() !== end.getFullYear() ? ' ' + start.getFullYear() : '';
+  document.getElementById('weekRange').textContent = 
+    formatDateShort(start) + ' – ' + formatDateShort(end) + ', ' + end.getFullYear();
+}
+
+function prevWeek() {
+  currentWeekOffset--;
+  updateWeekRange();
+  renderCalendar();
+}
+
+function nextWeek() {
+  currentWeekOffset++;
+  updateWeekRange();
+  renderCalendar();
+}
+
+function goToToday() {
+  currentWeekOffset = 0;
+  updateWeekRange();
+  renderCalendar();
+}
+
   function refreshData() {
-    if (isLoading) return;
-    isLoading = true;
-    document.getElementById('pageLoader').classList.remove('hidden');
-    
-    google.script.run
-      .withSuccessHandler(function(data) {
-        allData = data;
-        document.getElementById('seasonStart').value = data.seasonStart || '';
-        
-        const sf = document.getElementById('studioFilter');
-        sf.innerHTML = '<option value="">All Studios</option>';
-        data.studios.forEach(s => {
-          const opt = document.createElement('option');
-          opt.value = s.name; opt.textContent = s.name;
-          sf.appendChild(opt);
-        });
-        
-        updateNewStudioOptions();
-        applyFilters();
-        updateStats();
-        highlightToday();
-        
-        document.getElementById('pageLoader').classList.add('hidden');
-        isLoading = false;
-      })
-      .withFailureHandler(function(err) {
-        document.getElementById('pageLoader').classList.add('hidden');
-        isLoading = false;
-        showToast('Failed to load: ' + err.message, 'error');
-      })
-      .getWebAppData();
-  }
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('pageLoader').classList.remove('hidden');
   
+  google.script.run
+    .withSuccessHandler(function(data) {
+      allData = data;
+      document.getElementById('seasonStart').value = data.seasonStart || '';
+      
+      const sf = document.getElementById('studioFilter');
+      sf.innerHTML = '<option value="">All Studios</option>';
+      data.studios.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.name; opt.textContent = s.name;
+        sf.appendChild(opt);
+      });
+      
+      updateNewStudioOptions();
+      applyFilters();
+      updateStats();
+      highlightToday();
+      updateWeekRange();
+      if (currentView === 'students') renderStudents();
+      
+      document.getElementById('pageLoader').classList.add('hidden');
+      isLoading = false;
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('pageLoader').classList.add('hidden');
+      isLoading = false;
+      showToast('Failed to load: ' + err.message, 'error');
+    })
+    .getWebAppData();
+}
+
   function highlightToday() {
+    for (var i = 0; i < 6; i++) {
+      document.getElementById('calDayHeader' + i).classList.remove('today');
+    }
     var idx = new Date().getDay() - 1;
     if (idx >= 0 && idx < 6) {
       document.getElementById('calDayHeader' + idx).classList.add('today');
@@ -475,15 +598,47 @@
     if (currentView === 'calendar') renderCalendar();
   }
   
-  function switchView(view) {
-    currentView = view;
-    document.getElementById('listViewBtn').classList.toggle('active', view === 'list');
-    document.getElementById('calViewBtn').classList.toggle('active', view === 'calendar');
-    document.getElementById('tableContainer').style.display = view === 'list' ? 'block' : 'none';
-    document.getElementById('calendarContainer').classList.toggle('show', view === 'calendar');
-    if (view === 'calendar') renderCalendar();
-  }
+function switchView(view) {
+  currentView = view;
+  document.getElementById('listViewBtn').classList.toggle('active', view === 'list');
+  document.getElementById('calViewBtn').classList.toggle('active', view === 'calendar');
+  document.getElementById('studentsViewBtn').classList.toggle('active', view === 'students');
   
+  document.getElementById('tableContainer').style.display = view === 'list' ? 'block' : 'none';
+  document.getElementById('calendarContainer').classList.toggle('show', view === 'calendar');
+  document.getElementById('weekNav').classList.toggle('show', view === 'calendar');
+  document.getElementById('studentsContainer').classList.toggle('show', view === 'students');
+  document.getElementById('addClassBtn').style.display = view === 'students' ? 'none' : 'inline-flex';
+  document.getElementById('addStudentBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
+  
+  if (view === 'calendar') {
+    updateWeekRange();
+    renderCalendar();
+  }
+  if (view === 'students') renderStudents();
+}
+  function renderStudents() {
+    const tbody = document.getElementById('studentsTableBody');
+    if (!allData.students || allData.students.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="empty-state-icon">👥</div><div>No students yet. Click "Add Student" to get started.</div></td></tr>';
+      return;
+    }
+    
+    let html = '';
+    allData.students.forEach(s => {
+      html += `<tr data-row="${s.rowNum}">
+        <td><div class="cell-title">${escapeHtml(s.name)}</div></td>
+        <td>${escapeHtml(s.email)}</td>
+        <td><span class="status-pill status-active">${escapeHtml(s.role || 'Dancer')}</span></td>
+        <td><span style="color:var(--gray-500);font-size:12px;">${escapeHtml(s.notes)}</span></td>
+        <td>
+          <button class="action-btn" onclick="editStudent(${s.rowNum})" title="Edit">✏️</button>
+          <button class="action-btn" onclick="removeStudent(${s.rowNum})" title="Delete">🗑️</button>
+        </td>
+      </tr>`;
+    });
+    tbody.innerHTML = html;
+}
   // ===== LIST VIEW =====
   function filterAndRenderList() {
     const search = document.getElementById('searchInput').value.toLowerCase();
@@ -518,6 +673,7 @@
           <div class="cell-title" title="${escapeHtml(c.name)}">${escapeHtml(c.title)}</div>
           <div class="cell-sub">${escapeHtml(c.location)} &bull; Max ${c.maxSize || 'N/A'}</div>
           ${c.errorLog ? '<div class="error-badge" title="'+escapeHtml(c.errorLog)+'">⚠️ Error</div>' : ''}
+          ${c.students && c.students.length > 0 ? '<div class="student-count-badge">👤 ' + c.students.length + ' student' + (c.students.length > 1 ? 's' : '') + '</div>' : ''}
         </td>
         <td class="cell-time">${escapeHtml(c.day)}<br><span>${escapeHtml(c.startTime)} &bull; ${escapeHtml(c.length)}</span></td>
         <td>
@@ -549,6 +705,19 @@
     timeCol.innerHTML = '';
     
     const totalHeight = (GRID_END - GRID_START) * PX_PER_MIN;
+    
+    // Update day headers with dates
+    const weekStart = getWeekStart(currentWeekOffset);
+    for (var d = 0; d < 6; d++) {
+      var date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + d);
+      var header = document.getElementById('calDayHeader' + d);
+      header.textContent = DAY_NAMES[d] + ' ' + formatDateShort(date);
+      header.classList.remove('today');
+    }
+    if (currentWeekOffset === 0) {
+      highlightToday();
+    }
     
     for (var h = 8; h <= 21; h++) {
       var min = h * 60;
@@ -702,6 +871,7 @@
     var studio = dirty.studio !== undefined ? dirty.studio : cls.studio;
     var email = dirty.instructorEmail !== undefined ? dirty.instructorEmail : cls.instructorEmail;
     var status = dirty.status !== undefined ? dirty.status : cls.status;
+    var studentList = dirty ? (dirty.students || []) : (cls.students || []);
     
     var body = document.getElementById('editPanelBody');
     body.innerHTML = `
@@ -735,6 +905,16 @@
           <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
         </select>
       </div>
+      <div class="edit-field">
+        <label>Students (${allData.students ? allData.students.length : 0} in database)</label>
+        <select class="student-select-multi" id="panelStudents" multiple>
+          ${allData.students ? allData.students.map(s => {
+            var selected = (studentList.indexOf(s.email) !== -1) ? 'selected' : '';
+            return '<option value="' + escapeHtml(s.email) + '" ' + selected + '>' + escapeHtml(s.name) + ' (' + escapeHtml(s.email) + ')</option>';
+          }).join('') : ''}
+        </select>
+        <div class="hint">Hold Ctrl/Cmd to select multiple. Students will be invited to calendar events.</div>
+      </div>
     `;
     
     document.getElementById('editPanelOverlay').classList.add('show');
@@ -753,13 +933,22 @@
     var email = document.getElementById('panelEmail').value.trim();
     var status = document.getElementById('panelStatus').value;
     
-    queueChange(editingRowNum, 'studio', studio);
-    queueChange(editingRowNum, 'instructorEmail', email);
-    queueChange(editingRowNum, 'status', status);
-    
-    closeEditPanel();
-    showToast('Changes queued. Click Save Changes to apply.', 'success');
+    var studentSelect = document.getElementById('panelStudents');
+    var selectedStudents = [];
+    if (studentSelect) {
+      for (var i = 0; i < studentSelect.options.length; i++) {
+        if (studentSelect.options[i].selected) selectedStudents.push(studentSelect.options[i].value);
+      }
   }
+  
+  queueChange(editingRowNum, 'studio', studio);
+  queueChange(editingRowNum, 'instructorEmail', email);
+  queueChange(editingRowNum, 'status', status);
+  queueChange(editingRowNum, 'students', selectedStudents);
+  
+  closeEditPanel();
+  showToast('Changes queued. Click Save Changes to apply.', 'success');
+}
   
   function deleteFromPanel() {
     if (!editingRowNum) return;
@@ -771,20 +960,21 @@
   
   // ===== EDITING =====
   function queueChange(rowNum, field, value) {
-    if (!dirtyRows.has(rowNum)) {
-      var original = allData.classes.find(c => c.rowNum === rowNum);
-      dirtyRows.set(rowNum, { 
-        row: rowNum, 
-        studio: original.studio, 
-        instructorEmail: original.instructorEmail, 
-        status: original.status 
-      });
-    }
-    dirtyRows.get(rowNum)[field] = value;
-    filterAndRenderList();
-    if (currentView === 'calendar') renderCalendar();
-    updateSaveBar();
+  if (!dirtyRows.has(rowNum)) {
+    var original = allData.classes.find(c => c.rowNum === rowNum);
+    dirtyRows.set(rowNum, { 
+      row: rowNum, 
+      studio: original.studio, 
+      instructorEmail: original.instructorEmail, 
+      status: original.status,
+      students: original.students || []
+    });
   }
+  dirtyRows.get(rowNum)[field] = value;
+  filterAndRenderList();
+  if (currentView === 'calendar') renderCalendar();
+  updateSaveBar();
+}
   
   function updateSaveBar() {
     const bar = document.getElementById('saveBar');
@@ -797,6 +987,90 @@
     }
   }
   
+  function openStudentModal() {
+  editingStudentRow = null;
+  document.getElementById('studentModalTitle').textContent = 'Add Student';
+  document.getElementById('studentName').value = '';
+  document.getElementById('studentEmail').value = '';
+  document.getElementById('studentRole').value = 'Dancer';
+  document.getElementById('studentNotes').value = '';
+  document.getElementById('studentSubmitBtn').textContent = 'Add Student';
+  document.getElementById('studentModalOverlay').classList.add('show');
+}
+
+function closeStudentModal() {
+  document.getElementById('studentModalOverlay').classList.remove('show');
+  editingStudentRow = null;
+}
+
+function editStudent(rowNum) {
+  var s = allData.students.find(x => x.rowNum === rowNum);
+  if (!s) return;
+  editingStudentRow = rowNum;
+  document.getElementById('studentModalTitle').textContent = 'Edit Student';
+  document.getElementById('studentName').value = s.name;
+  document.getElementById('studentEmail').value = s.email;
+  document.getElementById('studentRole').value = s.role || 'Dancer';
+  document.getElementById('studentNotes').value = s.notes || '';
+  document.getElementById('studentSubmitBtn').textContent = 'Save Changes';
+  document.getElementById('studentModalOverlay').classList.add('show');
+}
+
+function submitStudent() {
+  var data = {
+    name: document.getElementById('studentName').value.trim(),
+    email: document.getElementById('studentEmail').value.trim(),
+    role: document.getElementById('studentRole').value,
+    notes: document.getElementById('studentNotes').value.trim()
+  };
+  if (!data.name || !data.email) {
+    showToast('Name and Email are required', 'warning');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    showToast('Please enter a valid email', 'warning');
+    return;
+  }
+  
+  if (editingStudentRow) {
+    data.rowNum = editingStudentRow;
+    google.script.run
+      .withSuccessHandler(function() {
+        closeStudentModal();
+        showToast('Student updated', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Update failed: ' + err.message, 'error');
+      })
+      .updateStudent(data);
+  } else {
+    google.script.run
+      .withSuccessHandler(function() {
+        closeStudentModal();
+        showToast('Student added', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Add failed: ' + err.message, 'error');
+      })
+      .addStudent(data);
+  }
+}
+
+function removeStudent(rowNum) {
+  if (!confirm('Delete this student from the database?')) return;
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast('Student deleted', 'success');
+      refreshData();
+    })
+    .withFailureHandler(function(err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    })
+    .deleteStudent(rowNum);
+}
+
   function saveAllChanges() {
     if (dirtyRows.size === 0) return;
     const updates = Array.from(dirtyRows.values());
