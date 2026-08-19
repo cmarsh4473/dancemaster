@@ -8,6 +8,7 @@ var CONFIG = {
   CLASSES_SHEET: "Classes",
   ROLES_SHEET: "Roles",
   STUDIO_CONFIG_SHEET: "Studio Config",
+  INSTRUCTORS_SHEET: "Instructors",
   STUDENTS_SHEET: "Students",
   RECURRENCE_YEARS: 10,
   IGNORE_PATTERN: /\bLevel\s*[4-7]\b/i,
@@ -38,6 +39,10 @@ var COL = {
 
 var STUDENT_COL = {
   NAME: 0, EMAIL: 1, ROLE: 2, NOTES: 3
+};
+
+var INSTRUCTOR_COL = {
+  NAME: 0, EMAIL: 1, PHONE: 2, NOTES: 3
 };
 
 function onOpen() {
@@ -130,6 +135,17 @@ function setupSpreadsheet() {
     rolesSheet.autoResizeColumns(1, 1);
   }
   
+  // Instructors sheet
+  var instructorsSheet = ss.getSheetByName(CONFIG.INSTRUCTORS_SHEET);
+  if (!instructorsSheet) {
+    instructorsSheet = ss.insertSheet(CONFIG.INSTRUCTORS_SHEET);
+    var instructorHeaders = ["Name", "Email", "Phone", "Notes"];
+    instructorsSheet.getRange(1, 1, 1, instructorHeaders.length).setValues([instructorHeaders])
+      .setFontWeight("bold").setBackground("#fbbc04").setFontColor("white");
+    instructorsSheet.setFrozenRows(1);
+    instructorsSheet.autoResizeColumns(1, 4);
+  }
+
   updateStudentValidation();
   SpreadsheetApp.getUi().alert("Setup Complete", "23-column Classes sheet + Students database ready.", SpreadsheetApp.getUi().ButtonSet.OK);
 }
@@ -161,15 +177,20 @@ function syncCalendars() {
   if (isNaN(seasonStart.getTime())) seasonStart = new Date();
   
   var studioMap = {};
-  var configData = configSheet.getRange(2, 1, CONFIG.STUDIOS.length, 4).getValues();
-  for (var i = 0; i < configData.length; i++) {
-    studioMap[configData[i][0]] = { colorId: configData[i][1], calendarId: configData[i][2] };
+  var configLastRow = configSheet.getLastRow();
+  if (configLastRow >= 2) {
+    var configData = configSheet.getRange(2, 1, configLastRow - 1, 5).getValues();
+    for (var i = 0; i < configData.length; i++) {
+      var name = configData[i][0] ? configData[i][0].toString().trim() : "";
+      var calId = configData[i][2] ? configData[i][2].toString().trim() : "";
+      if (name) studioMap[name] = { colorId: configData[i][1], calendarId: calId };
+    }
   }
   
   var lastRow = classesSheet.getLastRow();
   if (lastRow < 2) { ui.alert("No data found."); return; }
   
-  var dataRange = classesSheet.getRange(2, 1, lastRow - 1, 22);
+  var dataRange = classesSheet.getRange(2, 1, lastRow - 1, 23);
   var rows = dataRange.getValues();
   var updates = [];
   var stats = { created: 0, updated: 0, deleted: 0, skipped: 0, errors: 0, unchanged: 0 };
@@ -185,7 +206,7 @@ function syncCalendars() {
       
       if (CONFIG.IGNORE_PATTERN.test(name)) {
         stats.skipped++;
-        updates.push({ row: rowNum, errorLog: "Skipped (Level 4-7)" });
+        updates.push({ row: rowNum, errorLog: "" });
         continue;
       }
       
@@ -198,16 +219,16 @@ function syncCalendars() {
       if (status === "Deleted") {
         if (eventIds) {
           var delResult = deleteEventSeries(eventIds, storedCalId);
-          if (!delResult.success) errorLog += delResult.message + "; ";
+          if (!delResult.success) errorLog += "Delete old: " + delResult.message + "; ";
           stats.deleted++;
         }
-        updates.push({ row: rowNum, eventId: "", calId: "", status: "Deleted", syncHash: "", errorLog: errorLog || "Deleted" });
+        updates.push({ row: rowNum, eventId: "", calId: "", status: "Deleted", syncHash: "", errorLog: errorLog });
         continue;
       }
       
       if (!studio) {
         stats.skipped++;
-        updates.push({ row: rowNum, errorLog: "No studio assigned" });
+        updates.push({ row: rowNum, errorLog: "" });
         continue;
       }
       
@@ -277,36 +298,28 @@ function syncCalendars() {
         continue;
       }
       
-            if (needsGuestUpdate) {
-        var instructorEmail = row[COL.INSTRUCTOR_EMAIL] ? row[COL.INSTRUCTOR_EMAIL].toString().trim() : "";
-        var rawStudents = row[COL.STUDENTS] ? row[COL.STUDENTS].toString().trim() : "";
-        var studentEmails = rawStudents ? rawStudents.split(",").map(function(e) { return e.trim(); }).filter(function(e) { return e; }) : [];
-        
+      if (needsGuestUpdate) {
+        var instructorEmail = row[COL.INSTRUCTOR_EMAIL].toString().trim();
         var ids = eventIds.split(",");
         for (var j = 0; j < ids.length; j++) {
           try {
             var series = calendar.getEventSeriesById(ids[j].trim());
             if (series) {
-              // Clear existing guests
               var guests = series.getGuestList();
               for (var g = 0; g < guests.length; g++) series.removeGuest(guests[g].getEmail());
-              
-              // Re-add instructor
               if (instructorEmail) series.addGuest(instructorEmail);
-              
-              // Re-add students
-              for (var s = 0; s < studentEmails.length; s++) {
-                series.addGuest(studentEmails[s]);
-              }
             }
           } catch (e) {
             errorLog += "Guest update failed: " + e.message + "; ";
           }
         }
-        updates.push({ row: rowNum, errorLog: errorLog || "Guests updated" });
+        updates.push({ row: rowNum, errorLog: errorLog });
         stats.updated++;
         continue;
       }
+      
+      updates.push({ row: rowNum, errorLog: errorLog });
+      stats.unchanged++;
       
     } catch (rowError) {
       errorLog += "FATAL: " + rowError.message + "; ";
@@ -346,13 +359,67 @@ function computeEventHash(row, timeSlots) {
     .map(function(b) { return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('');
 }
 
+function getInstructors() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.INSTRUCTORS_SHEET);
+  if (!sheet) return [];
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  
+  var data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  var instructors = [];
+  for (var i = 0; i < data.length; i++) {
+    if (!data[i][INSTRUCTOR_COL.NAME]) continue;
+    instructors.push({
+      rowNum: i + 2,
+      name: data[i][INSTRUCTOR_COL.NAME].toString().trim(),
+      email: data[i][INSTRUCTOR_COL.EMAIL] ? data[i][INSTRUCTOR_COL.EMAIL].toString().trim() : "",
+      phone: data[i][INSTRUCTOR_COL.PHONE] ? data[i][INSTRUCTOR_COL.PHONE].toString().trim() : "",
+      notes: data[i][INSTRUCTOR_COL.NOTES] ? data[i][INSTRUCTOR_COL.NOTES].toString() : ""
+    });
+  }
+  return instructors;
+}
+
+function addInstructor(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.INSTRUCTORS_SHEET);
+  var row = sheet.getLastRow() + 1;
+  sheet.getRange(row, 1, 1, 4).setValues([[
+    data.name,
+    data.email,
+    data.phone || "",
+    data.notes || ""
+  ]]);
+  return { success: true, row: row };
+}
+
+function updateInstructor(data) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.INSTRUCTORS_SHEET);
+  sheet.getRange(data.rowNum, 1, 1, 4).setValues([[
+    data.name,
+    data.email,
+    data.phone || "",
+    data.notes || ""
+  ]]);
+  return { success: true };
+}
+
+function deleteInstructor(rowNum) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.INSTRUCTORS_SHEET);
+  sheet.deleteRow(rowNum);
+  return { success: true };
+}
+
 function createEventSeriesForRow(row, timeSlots, calendar, colorId, seasonStart) {
   var title = extractClassTitle(row[COL.NAME]);
   var description = buildEventDescription(row);
   var location = row[COL.STUDIO];
   var instructorEmail = row[COL.INSTRUCTOR_EMAIL] ? row[COL.INSTRUCTOR_EMAIL].toString().trim() : "";
   
-  // Parse student emails
+  // Parse student emails from the Students column (W)
   var studentEmails = [];
   var rawStudents = row[COL.STUDENTS] ? row[COL.STUDENTS].toString().trim() : "";
   if (rawStudents) {
@@ -373,12 +440,26 @@ function createEventSeriesForRow(row, timeSlots, calendar, colorId, seasonStart)
     });
     series.setColor(colorId.toString());
     
+    // Small delay so Calendar API propagates the series before adding guests
+    Utilities.sleep(500);
+    
     // Add instructor
-    if (instructorEmail) { try { series.addGuest(instructorEmail); } catch(e) {} }
+    if (instructorEmail) {
+      try {
+        series.addGuest(instructorEmail);
+      } catch(e) {
+        Logger.log("Failed to add instructor guest " + instructorEmail + ": " + e.message);
+      }
+    }
     
     // Add students
     for (var s = 0; s < studentEmails.length; s++) {
-      try { series.addGuest(studentEmails[s]); } catch(e) {}
+      try {
+        series.addGuest(studentEmails[s]);
+        Logger.log("Added student guest: " + studentEmails[s]);
+      } catch(e) {
+        Logger.log("Failed to add student guest " + studentEmails[s] + ": " + e.message);
+      }
     }
     
     eventIds.push(series.getId());
@@ -728,8 +809,8 @@ function addNewClass(classData) {
   var lastRow = classesSheet.getLastRow();
   var newRow = lastRow + 1;
   
-  // Build the row array (22 columns)
-  var row = new Array(22).fill("");
+  // Build the row array (23 columns A-W)
+  var row = new Array(23).fill("");
   row[COL.SEASON] = "Manual Add";
   row[COL.NAME] = classData.name;
   row[COL.TYPE] = "Downpayment";
@@ -744,8 +825,9 @@ function addNewClass(classData) {
   row[COL.STUDIO] = classData.studio;
   row[COL.INSTRUCTOR_EMAIL] = classData.instructorEmail || "";
   row[COL.STATUS] = "Active";
+  row[COL.STUDENTS] = ""; // Explicitly blank for new classes
   
-  classesSheet.getRange(newRow, 1, 1, 22).setValues([row]);
+  classesSheet.getRange(newRow, 1, 1, 23).setValues([row]);
   
   return { success: true, row: newRow };
 }
@@ -821,18 +903,20 @@ function quickSync(seasonStartStr) {
   }
   
   var studioMap = {};
-  var configData = configSheet.getRange(2, 1, CONFIG.STUDIOS.length, 4).getValues();
-  for (var i = 0; i < configData.length; i++) {
-    studioMap[configData[i][0]] = {
-      colorId: configData[i][1],
-      calendarId: configData[i][2]
-    };
+  var configLastRow = configSheet.getLastRow();
+  if (configLastRow >= 2) {
+    var configData = configSheet.getRange(2, 1, configLastRow - 1, 5).getValues();
+    for (var i = 0; i < configData.length; i++) {
+      var name = configData[i][0] ? configData[i][0].toString().trim() : "";
+      var calId = configData[i][2] ? configData[i][2].toString().trim() : "";
+      if (name) studioMap[name] = { colorId: configData[i][1], calendarId: calId };
+    }
   }
   
   var lastRow = classesSheet.getLastRow();
   if (lastRow < 2) throw new Error("No data found in Classes sheet.");
   
-  var dataRange = classesSheet.getRange(2, 1, lastRow - 1, 22);
+  var dataRange = classesSheet.getRange(2, 1, lastRow - 1, 23);
   var rows = dataRange.getValues();
   var updates = [];
   var stats = { created: 0, updated: 0, deleted: 0, skipped: 0, errors: 0, unchanged: 0 };
@@ -870,7 +954,7 @@ function quickSync(seasonStartStr) {
       
       if (!studio) {
         stats.skipped++;
-        updates.push({ row: rowNum, errorLog: "No studio assigned" });
+        updates.push({ row: rowNum, errorLog: "" });
         continue;
       }
       
@@ -1085,6 +1169,7 @@ function getWebAppData() {
     studioColors: studioColors,
     seasonStart: props.getProperty('seasonStart') || "",
     students: getStudents(),
+    instructors: getInstructors(),
     roles: getRoles()
   };
 }

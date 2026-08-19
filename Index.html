@@ -240,6 +240,7 @@
   <button class="btn btn-success" onclick="runSync()" id="syncBtn">⚡ Sync</button>
   <button class="btn btn-primary" id="addClassBtn" onclick="openModal()">➕ Class</button>
   <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()" style="display:none;">➕ Student</button>
+  <button class="btn btn-primary" id="addInstructorBtn" onclick="openInstructorModal()" style="display:none;">➕ Instructor</button>
   <button class="btn btn-secondary" id="manageRolesBtn" onclick="openRolesModal()" style="display:none;">⚙️ Roles</button>
   </div>
 </header>
@@ -272,6 +273,7 @@
   <button class="view-btn active" id="listViewBtn" onclick="switchView('list')">📋 List</button>
   <button class="view-btn" id="calViewBtn" onclick="switchView('calendar')">📅 Calendar</button>
   <button class="view-btn" id="studentsViewBtn" onclick="switchView('students')">👥 Students</button>
+  <button class="view-btn" id="instructorsViewBtn" onclick="switchView('instructors')">🎓 Instructors</button>
 </div>
 
 <div class="week-nav" id="weekNav">
@@ -346,6 +348,26 @@
   </div>
 </div>
 
+<!-- Instructors View -->
+<div class="students-container" id="instructorsContainer">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Notes</th>
+          <th style="width:100px"></th>
+        </tr>
+      </thead>
+      <tbody id="instructorsTableBody">
+        <tr><td colspan="5" class="empty-state"><div class="empty-state-icon">🎓</div><div>Loading instructors...</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <!-- Inline Edit Panel -->
 <div class="edit-panel-overlay" id="editPanelOverlay" onclick="closeEditPanel()"></div>
 <div class="edit-panel" id="editPanel">
@@ -415,8 +437,8 @@
           <input class="form-input" id="newMaxSize" placeholder="15">
         </div>
         <div class="form-group">
-          <label class="form-label">Instructor Email</label>
-          <input class="form-input" id="newInstructorEmail" type="email" placeholder="instructor@email.com">
+          <label class="form-label">Instructor</label>
+          <select class="form-select" id="newInstructorEmail"></select>
         </div>
         <div class="form-group full">
           <button class="btn btn-primary" onclick="submitNewClass()" style="width:100%; justify-content:center; padding:12px;">Add to Schedule</button>
@@ -438,6 +460,39 @@
       <div style="display:flex;gap:8px;">
         <input class="form-input" id="newRoleName" placeholder="New role name (e.g. Assistant)..." style="flex:1;">
         <button class="btn btn-primary" onclick="submitNewRole()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Instructor Modal -->
+<div class="modal-overlay" id="instructorModalOverlay" onclick="if(event.target===this)closeInstructorModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="instructorModalTitle">Add Instructor</h2>
+      <button class="modal-close" onclick="closeInstructorModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Full Name *</label>
+          <input class="form-input" id="instructorName" placeholder="Jane Doe">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Email *</label>
+          <input class="form-input" id="instructorEmail" type="email" placeholder="jane@email.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input class="form-input" id="instructorPhone" placeholder="(555) 123-4567">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <input class="form-input" id="instructorNotes" placeholder="Optional">
+        </div>
+        <div class="form-group full">
+          <button class="btn btn-primary" id="instructorSubmitBtn" onclick="submitInstructor()" style="width:100%; justify-content:center; padding:12px;">Save Instructor</button>
+        </div>
       </div>
     </div>
   </div>
@@ -548,6 +603,17 @@ function getStudentNameByEmail(email) {
   if (!allData.students) return email;
   var s = allData.students.find(function(st) { return st.email === email; });
   return s ? s.name : email;
+}
+
+function populateInstructorDropdowns() {
+  var instructors = allData.instructors || [];
+  var options = '<option value="">— Select Instructor —</option>' + 
+    instructors.map(function(i) {
+      return '<option value="' + escapeHtml(i.email) + '">' + escapeHtml(i.name) + '</option>';
+    }).join('');
+  
+  var addClassSelect = document.getElementById('newInstructorEmail');
+  if (addClassSelect) addClassSelect.innerHTML = options;
 }
 
 function getPanelAttendees(rowNum) {
@@ -768,7 +834,116 @@ function goToToday() {
   renderCalendar();
 }
 
-  function refreshData() {
+function renderInstructors() {
+  const tbody = document.getElementById('instructorsTableBody');
+  if (!allData.instructors || allData.instructors.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="empty-state-icon">🎓</div><div>No instructors yet. Click "Add Instructor" to get started.</div></td></tr>';
+    return;
+  }
+  
+  let html = '';
+  allData.instructors.forEach(inst => {
+    html += `<tr data-row="${inst.rowNum}">
+      <td><div class="cell-title">${escapeHtml(inst.name)}</div></td>
+      <td>${escapeHtml(inst.email)}</td>
+      <td><span style="color:var(--gray-500);font-size:12px;">${escapeHtml(inst.phone)}</span></td>
+      <td><span style="color:var(--gray-500);font-size:12px;">${escapeHtml(inst.notes)}</span></td>
+      <td>
+        <button class="action-btn" onclick="editInstructor(${inst.rowNum})" title="Edit">✏️</button>
+        <button class="action-btn" onclick="removeInstructor(${inst.rowNum})" title="Delete">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+let editingInstructorRow = null;
+
+function openInstructorModal() {
+  editingInstructorRow = null;
+  document.getElementById('instructorModalTitle').textContent = 'Add Instructor';
+  document.getElementById('instructorName').value = '';
+  document.getElementById('instructorEmail').value = '';
+  document.getElementById('instructorPhone').value = '';
+  document.getElementById('instructorNotes').value = '';
+  document.getElementById('instructorSubmitBtn').textContent = 'Add Instructor';
+  document.getElementById('instructorModalOverlay').classList.add('show');
+}
+
+function closeInstructorModal() {
+  document.getElementById('instructorModalOverlay').classList.remove('show');
+  editingInstructorRow = null;
+}
+
+function editInstructor(rowNum) {
+  var inst = allData.instructors.find(x => x.rowNum === rowNum);
+  if (!inst) return;
+  editingInstructorRow = rowNum;
+  document.getElementById('instructorModalTitle').textContent = 'Edit Instructor';
+  document.getElementById('instructorName').value = inst.name;
+  document.getElementById('instructorEmail').value = inst.email;
+  document.getElementById('instructorPhone').value = inst.phone || '';
+  document.getElementById('instructorNotes').value = inst.notes || '';
+  document.getElementById('instructorSubmitBtn').textContent = 'Save Changes';
+  document.getElementById('instructorModalOverlay').classList.add('show');
+}
+
+function submitInstructor() {
+  var data = {
+    name: document.getElementById('instructorName').value.trim(),
+    email: document.getElementById('instructorEmail').value.trim(),
+    phone: document.getElementById('instructorPhone').value.trim(),
+    notes: document.getElementById('instructorNotes').value.trim()
+  };
+  if (!data.name || !data.email) {
+    showToast('Name and Email are required', 'warning');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    showToast('Please enter a valid email', 'warning');
+    return;
+  }
+  
+  if (editingInstructorRow) {
+    data.rowNum = editingInstructorRow;
+    google.script.run
+      .withSuccessHandler(function() {
+        closeInstructorModal();
+        showToast('Instructor updated', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Update failed: ' + err.message, 'error');
+      })
+      .updateInstructor(data);
+  } else {
+    google.script.run
+      .withSuccessHandler(function() {
+        closeInstructorModal();
+        showToast('Instructor added', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Add failed: ' + err.message, 'error');
+      })
+      .addInstructor(data);
+  }
+}
+
+function removeInstructor(rowNum) {
+  if (!confirm('Delete this instructor from the database?')) return;
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast('Instructor deleted', 'success');
+      refreshData();
+    })
+    .withFailureHandler(function(err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    })
+    .deleteInstructor(rowNum);
+}
+
+function refreshData() {
   if (isLoading) return;
   isLoading = true;
   document.getElementById('pageLoader').classList.remove('hidden');
@@ -811,6 +986,7 @@ function goToToday() {
       highlightToday();
       updateWeekRange();
       populateRoleDropdowns();
+      populateInstructorDropdowns();
       if (currentView === 'students') renderStudents();
       
       document.getElementById('pageLoader').classList.add('hidden');
@@ -855,24 +1031,37 @@ function switchView(view) {
   document.getElementById('listViewBtn').classList.toggle('active', view === 'list');
   document.getElementById('calViewBtn').classList.toggle('active', view === 'calendar');
   document.getElementById('studentsViewBtn').classList.toggle('active', view === 'students');
+  document.getElementById('instructorsViewBtn').classList.toggle('active', view === 'instructors');
   
   document.getElementById('tableContainer').style.display = view === 'list' ? 'block' : 'none';
   document.getElementById('calendarContainer').classList.toggle('show', view === 'calendar');
   document.getElementById('weekNav').classList.toggle('show', view === 'calendar');
   document.getElementById('studentsContainer').classList.toggle('show', view === 'students');
-  document.getElementById('addClassBtn').style.display = view === 'students' ? 'none' : 'inline-flex';
+  document.getElementById('instructorsContainer').classList.toggle('show', view === 'instructors');
+  
+  document.getElementById('addClassBtn').style.display = (view === 'students' || view === 'instructors') ? 'none' : 'inline-flex';
   document.getElementById('addStudentBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
-  document.getElementById('addClassBtn').style.display = view === 'students' ? 'none' : 'inline-flex';
-  document.getElementById('addStudentBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
+  document.getElementById('addInstructorBtn').style.display = view === 'instructors' ? 'inline-flex' : 'none';
   document.getElementById('manageRolesBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
-
+  
   if (view === 'calendar') {
     updateWeekRange();
     renderCalendar();
   }
   if (view === 'students') renderStudents();
+  if (view === 'instructors') renderInstructors();
 }
-  function renderStudents() {
+
+function renderInstructorOptions(selectedEmail) {
+  var instructors = allData.instructors || [];
+  var html = '<option value="">— No Instructor —</option>';
+  instructors.forEach(function(inst) {
+    html += '<option value="' + escapeHtml(inst.email) + '" ' + (selectedEmail === inst.email ? 'selected' : '') + '>' + escapeHtml(inst.name) + '</option>';
+  });
+  return html;
+}
+
+function renderStudents() {
     const tbody = document.getElementById('studentsTableBody');
     if (!allData.students || allData.students.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="empty-state-icon">👥</div><div>No students yet. Click "Add Student" to get started.</div></td></tr>';
@@ -937,7 +1126,11 @@ function switchView(view) {
           ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
         </select>
       </td>
-      <td><input type="email" class="email-input" value="${escapeHtml(email)}" placeholder="No email" onchange="queueChange(${c.rowNum}, 'instructorEmail', this.value)"></td>
+      <td>
+        <select class="email-input" style="cursor:pointer;appearance:auto;" onchange="queueChange(${c.rowNum}, 'instructorEmail', this.value)">
+          ${renderInstructorOptions(email)}
+        </select>
+      </td>
       <td>
         <select class="status-select" onchange="queueChange(${c.rowNum}, 'status', this.value)">
           <option value="Active" ${status==='Active'?'selected':''}>Active</option>
@@ -1194,9 +1387,11 @@ function switchView(view) {
         ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
       </select>
     </div>
-    <div class="edit-field">
-      <label>Instructor Email</label>
-      <input type="email" id="panelEmail" value="${escapeHtml(email)}" placeholder="instructor@email.com">
+      <div class="edit-field">
+      <label>Instructor</label>
+      <select id="panelEmail" style="width:100%;border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;outline:none;cursor:pointer;">
+        ${renderInstructorOptions(email)}
+      </select>
     </div>
     
     <div class="edit-field">
