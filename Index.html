@@ -106,6 +106,19 @@
     
     .error-badge { display: inline-flex; align-items: center; gap: 4px; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: help; }
     
+    /* Students View */
+    .students-container { padding: 0 24px 24px; display: none; }
+    .students-container.show { display: block; }
+    .student-count-badge { display: inline-flex; align-items: center; gap: 4px; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .student-select-multi { width: 100%; min-height: 80px; border: 1px solid var(--gray-200); border-radius: 8px; padding: 8px; font-size: 13px; font-family: inherit; outline: none; }
+    .student-select-multi:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+    .student-tag { display: inline-flex; align-items: center; gap: 4px; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; margin: 2px; }
+    .attendee-chip { display:inline-flex; align-items:center; gap:6px; background:#e0e7ff; color:#3730a3; padding:6px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .chip-remove { background:rgba(55,48,163,0.12); color:#3730a3; border:none; width:18px; height:18px; border-radius:50%; cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:11px; padding:0; line-height:1; transition:background 0.15s; }
+    .chip-remove:hover { background:rgba(55,48,163,0.25); }
+    .student-result-row { padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--gray-100); display:flex; align-items:center; justify-content:space-between; transition:background 0.1s; }
+    .student-result-row:hover { background:var(--gray-50); }
+    .student-result-row:last-child { border-bottom:none; }
     /* Calendar */
     .calendar-container { padding: 0 24px 24px; display: none; }
     .calendar-container.show { display: block; }
@@ -131,6 +144,10 @@
     
     .empty-state { text-align: center; padding: 60px 20px; color: var(--gray-500); }
     .empty-state-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.3; }
+
+    .week-nav { padding: 0 24px 12px; display: none; align-items: center; gap: 12px; }
+    .week-nav.show { display: flex; }
+    .week-range { font-size: 14px; font-weight: 600; color: var(--gray-700); min-width: 180px; text-align: center; }
     
     /* Inline Edit Panel (slides out from right) */
     .edit-panel-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 250; }
@@ -215,13 +232,16 @@
     <span>Dance Studio Manager</span>
   </div>
   <div class="header-actions">
-    <div class="season-wrap">
-      <label>Season Start</label>
-      <input type="text" class="season-input" id="seasonStart" placeholder="MM/DD/YYYY">
-    </div>
-    <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh</button>
-    <button class="btn btn-success" onclick="runSync()" id="syncBtn">⚡ Sync to Calendar</button>
-    <button class="btn btn-primary" onclick="openModal()">➕ Add Class</button>
+  <div class="season-wrap">
+    <label>Season Start</label>
+    <input type="text" class="season-input" id="seasonStart" placeholder="MM/DD/YYYY">
+  </div>
+  <button class="btn btn-secondary" onclick="refreshData()">🔄 Refresh</button>
+  <button class="btn btn-success" onclick="runSync()" id="syncBtn">⚡ Sync</button>
+  <button class="btn btn-primary" id="addClassBtn" onclick="openModal()">➕ Class</button>
+  <button class="btn btn-primary" id="addStudentBtn" onclick="openStudentModal()" style="display:none;">➕ Student</button>
+  <button class="btn btn-primary" id="addInstructorBtn" onclick="openInstructorModal()" style="display:none;">➕ Instructor</button>
+  <button class="btn btn-secondary" id="manageRolesBtn" onclick="openRolesModal()" style="display:none;">⚙️ Roles</button>
   </div>
 </header>
 
@@ -250,8 +270,17 @@
 
 <!-- View Toggle -->
 <div class="view-toggle">
-  <button class="view-btn active" id="listViewBtn" onclick="switchView('list')">📋 List View</button>
-  <button class="view-btn" id="calViewBtn" onclick="switchView('calendar')">📅 Calendar View</button>
+  <button class="view-btn active" id="listViewBtn" onclick="switchView('list')">📋 List</button>
+  <button class="view-btn" id="calViewBtn" onclick="switchView('calendar')">📅 Calendar</button>
+  <button class="view-btn" id="studentsViewBtn" onclick="switchView('students')">👥 Students</button>
+  <button class="view-btn" id="instructorsViewBtn" onclick="switchView('instructors')">🎓 Instructors</button>
+</div>
+
+<div class="week-nav" id="weekNav">
+  <button class="btn btn-secondary" onclick="prevWeek()">← Prev</button>
+  <span class="week-range" id="weekRange">...</span>
+  <button class="btn btn-secondary" onclick="nextWeek()">Next →</button>
+  <button class="btn btn-secondary" onclick="goToToday()">Today</button>
 </div>
 
 <!-- List View -->
@@ -296,6 +325,46 @@
       <div class="cal-day-col" id="calDay4"></div>
       <div class="cal-day-col" id="calDay5"></div>
     </div>
+  </div>
+</div>
+
+<!-- Students View -->
+<div class="students-container" id="studentsContainer">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Notes</th>
+          <th style="width:100px"></th>
+        </tr>
+      </thead>
+      <tbody id="studentsTableBody">
+        <tr><td colspan="5" class="empty-state"><div class="empty-state-icon">👥</div><div>Loading students...</div></td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Instructors View -->
+<div class="students-container" id="instructorsContainer">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>Notes</th>
+          <th style="width:100px"></th>
+        </tr>
+      </thead>
+      <tbody id="instructorsTableBody">
+        <tr><td colspan="5" class="empty-state"><div class="empty-state-icon">🎓</div><div>Loading instructors...</div></td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -368,11 +437,94 @@
           <input class="form-input" id="newMaxSize" placeholder="15">
         </div>
         <div class="form-group">
-          <label class="form-label">Instructor Email</label>
-          <input class="form-input" id="newInstructorEmail" type="email" placeholder="instructor@email.com">
+          <label class="form-label">Instructor</label>
+          <select class="form-select" id="newInstructorEmail"></select>
         </div>
         <div class="form-group full">
           <button class="btn btn-primary" onclick="submitNewClass()" style="width:100%; justify-content:center; padding:12px;">Add to Schedule</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Roles Modal -->
+<div class="modal-overlay" id="rolesModalOverlay" onclick="if(event.target===this)closeRolesModal()">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <h2>Manage Roles</h2>
+      <button class="modal-close" onclick="closeRolesModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="rolesList" style="margin-bottom:16px;"></div>
+      <div style="display:flex;gap:8px;">
+        <input class="form-input" id="newRoleName" placeholder="New role name (e.g. Assistant)..." style="flex:1;">
+        <button class="btn btn-primary" onclick="submitNewRole()">Add</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Instructor Modal -->
+<div class="modal-overlay" id="instructorModalOverlay" onclick="if(event.target===this)closeInstructorModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="instructorModalTitle">Add Instructor</h2>
+      <button class="modal-close" onclick="closeInstructorModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Full Name *</label>
+          <input class="form-input" id="instructorName" placeholder="Jane Doe">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Email *</label>
+          <input class="form-input" id="instructorEmail" type="email" placeholder="jane@email.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input class="form-input" id="instructorPhone" placeholder="(555) 123-4567">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <input class="form-input" id="instructorNotes" placeholder="Optional">
+        </div>
+        <div class="form-group full">
+          <button class="btn btn-primary" id="instructorSubmitBtn" onclick="submitInstructor()" style="width:100%; justify-content:center; padding:12px;">Save Instructor</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Student Modal -->
+<div class="modal-overlay" id="studentModalOverlay" onclick="if(event.target===this)closeStudentModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="studentModalTitle">Add Student</h2>
+      <button class="modal-close" onclick="closeStudentModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group full">
+          <label class="form-label">Full Name *</label>
+          <input class="form-input" id="studentName" placeholder="Jane Doe">
+        </div>
+        <div class="form-group full">
+          <label class="form-label">Email *</label>
+          <input class="form-input" id="studentEmail" type="email" placeholder="jane@email.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select class="form-select" id="studentRole"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <input class="form-input" id="studentNotes" placeholder="Optional">
+        </div>
+        <div class="form-group full">
+          <button class="btn btn-primary" id="studentSubmitBtn" onclick="submitStudent()" style="width:100%; justify-content:center; padding:12px;">Save Student</button>
         </div>
       </div>
     </div>
@@ -384,7 +536,9 @@
   let dirtyRows = new Map();
   let isLoading = false;
   let currentView = 'list';
+  let currentWeekOffset = 0;
   let editingRowNum = null;
+  let editingStudentRow = null;
   
   const DAY_NAMES = ['Mon','Tue','Wed','Thu','Fri','Sat'];
   const FULL_DAY_NAMES = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -401,7 +555,20 @@
     var brightness = (r * 299 + g * 587 + b * 114) / 1000;
     return brightness < 140;
   }
-  
+
+  function studioMatchesFilter(classStudio, filterValue) {
+    if (!filterValue) return true;
+    if (filterValue === '__CHARLOTTE__') {
+      var charlotteStudios = allData.studios.filter(s => s.location === 'Charlotte').map(s => s.name);
+      return charlotteStudios.includes(classStudio);
+    }
+    if (filterValue === '__CONCORD__') {
+      var concordStudios = allData.studios.filter(s => s.location === 'Concord').map(s => s.name);
+      return concordStudios.includes(classStudio);
+    }
+    return classStudio === filterValue;
+}
+
   function showToast(message, type) {
     const container = document.getElementById('toastContainer');
     const toast = document.createElement('div');
@@ -418,41 +585,425 @@
     return div.innerHTML;
   }
   
-  function refreshData() {
-    if (isLoading) return;
-    isLoading = true;
-    document.getElementById('pageLoader').classList.remove('hidden');
-    
-    google.script.run
-      .withSuccessHandler(function(data) {
-        allData = data;
-        document.getElementById('seasonStart').value = data.seasonStart || '';
-        
-        const sf = document.getElementById('studioFilter');
-        sf.innerHTML = '<option value="">All Studios</option>';
-        data.studios.forEach(s => {
-          const opt = document.createElement('option');
-          opt.value = s.name; opt.textContent = s.name;
-          sf.appendChild(opt);
-        });
-        
-        updateNewStudioOptions();
-        applyFilters();
-        updateStats();
-        highlightToday();
-        
-        document.getElementById('pageLoader').classList.add('hidden');
-        isLoading = false;
-      })
-      .withFailureHandler(function(err) {
-        document.getElementById('pageLoader').classList.add('hidden');
-        isLoading = false;
-        showToast('Failed to load: ' + err.message, 'error');
-      })
-      .getWebAppData();
+  function getWeekStart(offset) {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun, 1=Mon...
+  const monday = new Date(now);
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1) + (offset * 7);
+  monday.setDate(diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
+}
+
+function formatDateShort(date) {
+  return (date.getMonth() + 1) + '/' + date.getDate();
+}
+
+function getStudentNameByEmail(email) {
+  if (!allData.students) return email;
+  var s = allData.students.find(function(st) { return st.email === email; });
+  return s ? s.name : email;
+}
+
+function populateInstructorDropdowns() {
+  var instructors = allData.instructors || [];
+  var options = '<option value="">— Select Instructor —</option>' + 
+    instructors.map(function(i) {
+      return '<option value="' + escapeHtml(i.email) + '">' + escapeHtml(i.name) + '</option>';
+    }).join('');
+  
+  var addClassSelect = document.getElementById('newInstructorEmail');
+  if (addClassSelect) addClassSelect.innerHTML = options;
+}
+
+function getPanelAttendees(rowNum) {
+  var dirty = dirtyRows.get(rowNum);
+  var cls = allData.classes.find(c => c.rowNum === rowNum);
+  if (dirty && dirty.students) return dirty.students.slice();
+  return cls && cls.students ? cls.students.slice() : [];
+}
+
+function renderPanelAttendees(rowNum, list) {
+  var container = document.getElementById('panelAttendingList');
+  var countEl = document.getElementById('panelAttendeeCount');
+  if (!container) return;
+  
+  if (list.length === 0) {
+    container.innerHTML = '<span style="color:#9ca3af;font-size:13px;">No students assigned. Search below to add.</span>';
+  } else {
+    container.innerHTML = list.map(function(email) {
+      return '<div class="attendee-chip" data-email="' + escapeHtml(email) + '">' +
+        '<span>' + escapeHtml(getStudentNameByEmail(email)) + '</span>' +
+        '<button type="button" class="chip-remove" onclick="removeAttendee(' + rowNum + ', \'' + escapeHtml(email) + '\')" title="Remove">✕</button>' +
+      '</div>';
+    }).join('');
+  }
+  if (countEl) countEl.textContent = list.length + ' student' + (list.length !== 1 ? 's' : '');
+}
+
+function removeAttendee(rowNum, email) {
+  var list = getPanelAttendees(rowNum);
+  var idx = list.indexOf(email);
+  if (idx !== -1) {
+    list.splice(idx, 1);
+    queueChange(rowNum, 'students', list);
+    renderPanelAttendees(rowNum, list);
+    // Re-run search in case they want to re-add
+    filterPanelStudents(rowNum);
+  }
+}
+
+function filterPanelStudents(rowNum) {
+  var input = document.getElementById('panelStudentSearch');
+  var resultsBox = document.getElementById('panelStudentResults');
+  if (!input || !resultsBox) return;
+  
+  var query = input.value.toLowerCase().trim();
+  var currentList = getPanelAttendees(rowNum);
+  var attendingSet = new Set(currentList);
+  
+  if (!query) {
+    resultsBox.style.display = 'none';
+    resultsBox.innerHTML = '';
+    return;
   }
   
+  var matches = [];
+  if (allData.students) {
+    matches = allData.students.filter(function(s) {
+      return !attendingSet.has(s.email) &&
+        (s.name.toLowerCase().includes(query) || s.email.toLowerCase().includes(query));
+    });
+  }
+  
+  if (matches.length === 0) {
+    resultsBox.innerHTML = '<div style="padding:16px;text-align:center;color:#9ca3af;font-size:13px;">No students found</div>';
+  } else {
+    resultsBox.innerHTML = matches.map(function(s) {
+      return '<div class="student-result-row" onclick="addPanelStudent(' + rowNum + ', \'' + escapeHtml(s.email) + '\')">' +
+        '<div>' +
+          '<div style="font-size:13px;font-weight:600;color:var(--gray-900);">' + escapeHtml(s.name) + '</div>' +
+          '<div style="font-size:12px;color:var(--gray-500);">' + escapeHtml(s.email) + ' • ' + escapeHtml(s.role || 'Dancer') + '</div>' +
+        '</div>' +
+        '<span style="font-size:18px;color:var(--primary);font-weight:700;">+</span>' +
+      '</div>';
+    }).join('');
+  }
+  resultsBox.style.display = 'block';
+}
+
+function addPanelStudent(rowNum, email) {
+  var list = getPanelAttendees(rowNum);
+  if (list.indexOf(email) === -1) {
+    list.push(email);
+    queueChange(rowNum, 'students', list);
+    renderPanelAttendees(rowNum, list);
+  }
+  // Clear search
+  var input = document.getElementById('panelStudentSearch');
+  if (input) input.value = '';
+  filterPanelStudents(rowNum);
+}
+
+// Close student search dropdown when clicking outside the panel's student section
+document.addEventListener('click', function(e) {
+  var results = document.getElementById('panelStudentResults');
+  var searchWrap = document.getElementById('panelStudentSearch');
+  if (results && searchWrap && !searchWrap.contains(e.target) && !results.contains(e.target)) {
+    results.style.display = 'none';
+  }
+});
+
+function updateWeekRange() {
+  const start = getWeekStart(currentWeekOffset);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 5);
+  const year = start.getFullYear() !== end.getFullYear() ? ' ' + start.getFullYear() : '';
+  document.getElementById('weekRange').textContent = 
+    formatDateShort(start) + ' – ' + formatDateShort(end) + ', ' + end.getFullYear();
+}
+
+function populateRoleDropdowns() {
+  var roles = allData.roles || [];
+  var studentRole = document.getElementById('studentRole');
+  if (studentRole) {
+    studentRole.innerHTML = roles.map(function(r) {
+      return '<option value="' + escapeHtml(r) + '">' + escapeHtml(r) + '</option>';
+    }).join('');
+  }
+}
+
+function bulkAddByRole(rowNum, role) {
+  if (!allData.students) return;
+  var currentList = getPanelAttendees(rowNum);
+  var attendingSet = new Set(currentList);
+  var added = 0;
+  allData.students.forEach(function(s) {
+    if (s.role === role && !attendingSet.has(s.email)) {
+      currentList.push(s.email);
+      attendingSet.add(s.email);
+      added++;
+    }
+  });
+  if (added > 0) {
+    queueChange(rowNum, 'students', currentList);
+    renderPanelAttendees(rowNum, currentList);
+    showToast('Added ' + added + ' ' + role.toLowerCase() + (added !== 1 ? 's' : ''), 'success');
+  } else {
+    showToast('No ' + role.toLowerCase() + 's found to add', 'warning');
+  }
+}
+
+// ===== ROLES MANAGEMENT =====
+function openRolesModal() {
+  renderRolesList();
+  document.getElementById('newRoleName').value = '';
+  document.getElementById('rolesModalOverlay').classList.add('show');
+}
+
+function closeRolesModal() {
+  document.getElementById('rolesModalOverlay').classList.remove('show');
+}
+
+function renderRolesList() {
+  var roles = allData.roles || [];
+  var container = document.getElementById('rolesList');
+  if (roles.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:16px;">No roles defined</div>';
+    return;
+  }
+  container.innerHTML = roles.map(function(r, idx) {
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--gray-100);">' +
+      '<span style="font-weight:600;font-size:14px;">' + escapeHtml(r) + '</span>' +
+      '<button class="action-btn" onclick="deleteRoleByIndex(' + (idx + 2) + ')" title="Delete role">🗑️</button>' +
+    '</div>';
+  }).join('');
+}
+
+function submitNewRole() {
+  var name = document.getElementById('newRoleName').value.trim();
+  if (!name) {
+    showToast('Enter a role name', 'warning');
+    return;
+  }
+  if ((allData.roles || []).indexOf(name) !== -1) {
+    showToast('That role already exists', 'warning');
+    return;
+  }
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast('Role added', 'success');
+      refreshData();
+      setTimeout(renderRolesList, 300);
+    })
+    .withFailureHandler(function(err) {
+      showToast('Failed: ' + err.message, 'error');
+    })
+    .addRole(name);
+}
+
+function deleteRoleByIndex(rowNum) {
+  if (!confirm('Delete this role? It will remain on existing students until changed.')) return;
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast('Role deleted', 'success');
+      refreshData();
+      setTimeout(renderRolesList, 300);
+    })
+    .withFailureHandler(function(err) {
+      showToast('Failed: ' + err.message, 'error');
+    })
+    .deleteRole(rowNum);
+}
+
+function prevWeek() {
+  currentWeekOffset--;
+  updateWeekRange();
+  renderCalendar();
+}
+
+function nextWeek() {
+  currentWeekOffset++;
+  updateWeekRange();
+  renderCalendar();
+}
+
+function goToToday() {
+  currentWeekOffset = 0;
+  updateWeekRange();
+  renderCalendar();
+}
+
+function renderInstructors() {
+  const tbody = document.getElementById('instructorsTableBody');
+  if (!allData.instructors || allData.instructors.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="empty-state-icon">🎓</div><div>No instructors yet. Click "Add Instructor" to get started.</div></td></tr>';
+    return;
+  }
+  
+  let html = '';
+  allData.instructors.forEach(inst => {
+    html += `<tr data-row="${inst.rowNum}">
+      <td><div class="cell-title">${escapeHtml(inst.name)}</div></td>
+      <td>${escapeHtml(inst.email)}</td>
+      <td><span style="color:var(--gray-500);font-size:12px;">${escapeHtml(inst.phone)}</span></td>
+      <td><span style="color:var(--gray-500);font-size:12px;">${escapeHtml(inst.notes)}</span></td>
+      <td>
+        <button class="action-btn" onclick="editInstructor(${inst.rowNum})" title="Edit">✏️</button>
+        <button class="action-btn" onclick="removeInstructor(${inst.rowNum})" title="Delete">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
+
+let editingInstructorRow = null;
+
+function openInstructorModal() {
+  editingInstructorRow = null;
+  document.getElementById('instructorModalTitle').textContent = 'Add Instructor';
+  document.getElementById('instructorName').value = '';
+  document.getElementById('instructorEmail').value = '';
+  document.getElementById('instructorPhone').value = '';
+  document.getElementById('instructorNotes').value = '';
+  document.getElementById('instructorSubmitBtn').textContent = 'Add Instructor';
+  document.getElementById('instructorModalOverlay').classList.add('show');
+}
+
+function closeInstructorModal() {
+  document.getElementById('instructorModalOverlay').classList.remove('show');
+  editingInstructorRow = null;
+}
+
+function editInstructor(rowNum) {
+  var inst = allData.instructors.find(x => x.rowNum === rowNum);
+  if (!inst) return;
+  editingInstructorRow = rowNum;
+  document.getElementById('instructorModalTitle').textContent = 'Edit Instructor';
+  document.getElementById('instructorName').value = inst.name;
+  document.getElementById('instructorEmail').value = inst.email;
+  document.getElementById('instructorPhone').value = inst.phone || '';
+  document.getElementById('instructorNotes').value = inst.notes || '';
+  document.getElementById('instructorSubmitBtn').textContent = 'Save Changes';
+  document.getElementById('instructorModalOverlay').classList.add('show');
+}
+
+function submitInstructor() {
+  var data = {
+    name: document.getElementById('instructorName').value.trim(),
+    email: document.getElementById('instructorEmail').value.trim(),
+    phone: document.getElementById('instructorPhone').value.trim(),
+    notes: document.getElementById('instructorNotes').value.trim()
+  };
+  if (!data.name || !data.email) {
+    showToast('Name and Email are required', 'warning');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    showToast('Please enter a valid email', 'warning');
+    return;
+  }
+  
+  if (editingInstructorRow) {
+    data.rowNum = editingInstructorRow;
+    google.script.run
+      .withSuccessHandler(function() {
+        closeInstructorModal();
+        showToast('Instructor updated', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Update failed: ' + err.message, 'error');
+      })
+      .updateInstructor(data);
+  } else {
+    google.script.run
+      .withSuccessHandler(function() {
+        closeInstructorModal();
+        showToast('Instructor added', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Add failed: ' + err.message, 'error');
+      })
+      .addInstructor(data);
+  }
+}
+
+function removeInstructor(rowNum) {
+  if (!confirm('Delete this instructor from the database?')) return;
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast('Instructor deleted', 'success');
+      refreshData();
+    })
+    .withFailureHandler(function(err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    })
+    .deleteInstructor(rowNum);
+}
+
+function refreshData() {
+  if (isLoading) return;
+  isLoading = true;
+  document.getElementById('pageLoader').classList.remove('hidden');
+  
+  google.script.run
+    .withSuccessHandler(function(data) {
+      allData = data;
+      document.getElementById('seasonStart').value = data.seasonStart || '';
+      
+            const sf = document.getElementById('studioFilter');
+      sf.innerHTML = '<option value="">All Studios</option>';
+      
+      // Individual studios
+      data.studios.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.name;
+        opt.textContent = s.name;
+        sf.appendChild(opt);
+      });
+      
+      // Location group filters
+      const groupOpt = document.createElement('option');
+      groupOpt.disabled = true;
+      groupOpt.textContent = '──────────';
+      sf.appendChild(groupOpt);
+      
+      const charlotteOpt = document.createElement('option');
+      charlotteOpt.value = '__CHARLOTTE__';
+      charlotteOpt.textContent = 'All Charlotte Locations';
+      sf.appendChild(charlotteOpt);
+      
+      const concordOpt = document.createElement('option');
+      concordOpt.value = '__CONCORD__';
+      concordOpt.textContent = 'All Concord Locations';
+      sf.appendChild(concordOpt);
+      
+      updateNewStudioOptions();
+      applyFilters();
+      updateStats();
+      highlightToday();
+      updateWeekRange();
+      populateRoleDropdowns();
+      populateInstructorDropdowns();
+      if (currentView === 'students') renderStudents();
+      
+      document.getElementById('pageLoader').classList.add('hidden');
+      isLoading = false;
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('pageLoader').classList.add('hidden');
+      isLoading = false;
+      showToast('Failed to load: ' + err.message, 'error');
+    })
+    .getWebAppData();
+}
+
   function highlightToday() {
+    for (var i = 0; i < 6; i++) {
+      document.getElementById('calDayHeader' + i).classList.remove('today');
+    }
     var idx = new Date().getDay() - 1;
     if (idx >= 0 && idx < 6) {
       document.getElementById('calDayHeader' + idx).classList.add('today');
@@ -475,70 +1026,126 @@
     if (currentView === 'calendar') renderCalendar();
   }
   
-  function switchView(view) {
-    currentView = view;
-    document.getElementById('listViewBtn').classList.toggle('active', view === 'list');
-    document.getElementById('calViewBtn').classList.toggle('active', view === 'calendar');
-    document.getElementById('tableContainer').style.display = view === 'list' ? 'block' : 'none';
-    document.getElementById('calendarContainer').classList.toggle('show', view === 'calendar');
-    if (view === 'calendar') renderCalendar();
-  }
+function switchView(view) {
+  currentView = view;
+  document.getElementById('listViewBtn').classList.toggle('active', view === 'list');
+  document.getElementById('calViewBtn').classList.toggle('active', view === 'calendar');
+  document.getElementById('studentsViewBtn').classList.toggle('active', view === 'students');
+  document.getElementById('instructorsViewBtn').classList.toggle('active', view === 'instructors');
   
-  // ===== LIST VIEW =====
-  function filterAndRenderList() {
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    const studioF = document.getElementById('studioFilter').value;
-    const statusF = document.getElementById('statusFilter').value;
-    const dayF = document.getElementById('dayFilter').value;
-    
-    const filtered = allData.classes.filter(c => {
-      if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return false;
-      if (studioF && c.studio !== studioF) return false;
-      if (statusF && c.status !== statusF) return false;
-      if (dayF && !c.day.includes(dayF.substring(0,2)) && !c.day.includes(dayF)) return false;
-      return true;
-    });
-    
-    const tbody = document.getElementById('tableBody');
-    if (filtered.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">📭</div><div>No classes match your filters</div></td></tr>';
+  document.getElementById('tableContainer').style.display = view === 'list' ? 'block' : 'none';
+  document.getElementById('calendarContainer').classList.toggle('show', view === 'calendar');
+  document.getElementById('weekNav').classList.toggle('show', view === 'calendar');
+  document.getElementById('studentsContainer').classList.toggle('show', view === 'students');
+  document.getElementById('instructorsContainer').classList.toggle('show', view === 'instructors');
+  
+  document.getElementById('addClassBtn').style.display = (view === 'students' || view === 'instructors') ? 'none' : 'inline-flex';
+  document.getElementById('addStudentBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
+  document.getElementById('addInstructorBtn').style.display = view === 'instructors' ? 'inline-flex' : 'none';
+  document.getElementById('manageRolesBtn').style.display = view === 'students' ? 'inline-flex' : 'none';
+  
+  if (view === 'calendar') {
+    updateWeekRange();
+    renderCalendar();
+  }
+  if (view === 'students') renderStudents();
+  if (view === 'instructors') renderInstructors();
+}
+
+function renderInstructorOptions(selectedEmail) {
+  var instructors = allData.instructors || [];
+  var html = '<option value="">— No Instructor —</option>';
+  instructors.forEach(function(inst) {
+    html += '<option value="' + escapeHtml(inst.email) + '" ' + (selectedEmail === inst.email ? 'selected' : '') + '>' + escapeHtml(inst.name) + '</option>';
+  });
+  return html;
+}
+
+function renderStudents() {
+    const tbody = document.getElementById('studentsTableBody');
+    if (!allData.students || allData.students.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-state"><div class="empty-state-icon">👥</div><div>No students yet. Click "Add Student" to get started.</div></td></tr>';
       return;
     }
     
     let html = '';
-    filtered.forEach(c => {
-      const dirty = dirtyRows.get(c.rowNum);
-      const studio = dirty ? dirty.studio : c.studio;
-      const email = dirty ? dirty.instructorEmail : c.instructorEmail;
-      const status = dirty ? dirty.status : c.status;
-      const isDeleted = status === 'Deleted';
-      
-      html += `<tr class="${dirty?'dirty':''} ${isDeleted?'deleted':''}" data-row="${c.rowNum}">
+    allData.students.forEach(s => {
+      html += `<tr data-row="${s.rowNum}">
+        <td><div class="cell-title">${escapeHtml(s.name)}</div></td>
+        <td>${escapeHtml(s.email)}</td>
+        <td><span class="status-pill status-active">${escapeHtml(s.role || 'Dancer')}</span></td>
+        <td><span style="color:var(--gray-500);font-size:12px;">${escapeHtml(s.notes)}</span></td>
         <td>
-          <div class="cell-title" title="${escapeHtml(c.name)}">${escapeHtml(c.title)}</div>
-          <div class="cell-sub">${escapeHtml(c.location)} &bull; Max ${c.maxSize || 'N/A'}</div>
-          ${c.errorLog ? '<div class="error-badge" title="'+escapeHtml(c.errorLog)+'">⚠️ Error</div>' : ''}
+          <button class="action-btn" onclick="editStudent(${s.rowNum})" title="Edit">✏️</button>
+          <button class="action-btn" onclick="removeStudent(${s.rowNum})" title="Delete">🗑️</button>
         </td>
-        <td class="cell-time">${escapeHtml(c.day)}<br><span>${escapeHtml(c.startTime)} &bull; ${escapeHtml(c.length)}</span></td>
-        <td>
-          <select class="studio-select" onchange="queueChange(${c.rowNum}, 'studio', this.value)">
-            <option value="">— Select —</option>
-            ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
-          </select>
-        </td>
-        <td><input type="email" class="email-input" value="${escapeHtml(email)}" placeholder="No email" onchange="queueChange(${c.rowNum}, 'instructorEmail', this.value)"></td>
-        <td>
-          <select class="status-select" onchange="queueChange(${c.rowNum}, 'status', this.value)">
-            <option value="Active" ${status==='Active'?'selected':''}>Active</option>
-            <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
-          </select>
-          <span class="status-pill ${status==='Active'?'status-active':status==='Deleted'?'status-deleted':'status-unassigned'}">${status || 'Active'}</span>
-        </td>
-        <td><button class="action-btn" onclick="removeClass(${c.rowNum})" title="Remove class">🗑️</button></td>
       </tr>`;
     });
     tbody.innerHTML = html;
+}
+  // ===== LIST VIEW =====
+  function filterAndRenderList() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const studioF = document.getElementById('studioFilter').value;
+  const statusF = document.getElementById('statusFilter').value;
+  const dayF = document.getElementById('dayFilter').value;
+  
+  const filtered = allData.classes.filter(c => {
+    if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return false;
+    if (studioF && !studioMatchesFilter(c.studio, studioF)) return false;
+    if (statusF && c.status !== statusF) return false;
+    if (dayF && !c.day.includes(dayF.substring(0,2)) && !c.day.includes(dayF)) return false;
+    return true;
+  });
+  
+  const tbody = document.getElementById('tableBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state"><div class="empty-state-icon">📭</div><div>No classes match your filters</div></td></tr>';
+    return;
   }
+  
+  let html = '';
+  filtered.forEach(c => {
+    const dirty = dirtyRows.get(c.rowNum);
+    const studio = dirty ? dirty.studio : c.studio;
+    const email = dirty ? dirty.instructorEmail : c.instructorEmail;
+    const status = dirty ? dirty.status : c.status;
+    const isDeleted = status === 'Deleted';
+    
+    html += `<tr class="${dirty?'dirty':''} ${isDeleted?'deleted':''}" data-row="${c.rowNum}">
+      <td>
+        <div class="cell-title" title="${escapeHtml(c.name)}">${escapeHtml(c.title)}</div>
+        <div class="cell-sub">${escapeHtml(c.location)} &bull; Max ${c.maxSize || 'N/A'}</div>
+        ${c.errorLog ? '<div class="error-badge" title="'+escapeHtml(c.errorLog)+'">⚠️ Error</div>' : ''}
+        ${c.students && c.students.length > 0 ? '<div class="student-count-badge">👤 ' + c.students.length + ' student' + (c.students.length > 1 ? 's' : '') + '</div>' : ''}
+      </td>
+      <td class="cell-time">${escapeHtml(c.day)}<br><span>${escapeHtml(c.startTime)} &bull; ${escapeHtml(c.length)}</span></td>
+      <td>
+        <select class="studio-select" onchange="queueChange(${c.rowNum}, 'studio', this.value)">
+          <option value="">— Select —</option>
+          ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select class="email-input" style="cursor:pointer;appearance:auto;" onchange="queueChange(${c.rowNum}, 'instructorEmail', this.value)">
+          ${renderInstructorOptions(email)}
+        </select>
+      </td>
+      <td>
+        <select class="status-select" onchange="queueChange(${c.rowNum}, 'status', this.value)">
+          <option value="Active" ${status==='Active'?'selected':''}>Active</option>
+          <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
+        </select>
+        <span class="status-pill ${status==='Active'?'status-active':status==='Deleted'?'status-deleted':'status-unassigned'}">${status || 'Active'}</span>
+      </td>
+      <td>
+        <button class="action-btn" onclick="openEditPanel(${c.rowNum})" title="Edit class">✏️</button>
+        <button class="action-btn" onclick="removeClass(${c.rowNum})" title="Remove class">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+}
   
   // ===== CALENDAR VIEW =====
   function renderCalendar() {
@@ -549,6 +1156,19 @@
     timeCol.innerHTML = '';
     
     const totalHeight = (GRID_END - GRID_START) * PX_PER_MIN;
+    
+    // Update day headers with dates
+    const weekStart = getWeekStart(currentWeekOffset);
+    for (var d = 0; d < 6; d++) {
+      var date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + d);
+      var header = document.getElementById('calDayHeader' + d);
+      header.textContent = DAY_NAMES[d] + ' ' + formatDateShort(date);
+      header.classList.remove('today');
+    }
+    if (currentWeekOffset === 0) {
+      highlightToday();
+    }
     
     for (var h = 8; h <= 21; h++) {
       var min = h * 60;
@@ -582,7 +1202,7 @@
     allData.classes.forEach(function(c) {
       if (c.status === 'Deleted') return;
       if (search && !c.name.toLowerCase().includes(search) && !c.title.toLowerCase().includes(search)) return;
-      if (studioF && c.studio !== studioF) return;
+      if (studioF && !studioMatchesFilter(c.studio, studioF)) return;
       if (statusF && c.status !== statusF) return;
       
       var days = expandDays(c.day);
@@ -693,53 +1313,127 @@
   }
   
   // ===== INLINE EDIT PANEL =====
-  function openEditPanel(rowNum) {
-    editingRowNum = rowNum;
-    var cls = allData.classes.find(c => c.rowNum === rowNum);
-    if (!cls) return;
-    
-    var dirty = dirtyRows.get(rowNum) || {};
-    var studio = dirty.studio !== undefined ? dirty.studio : cls.studio;
-    var email = dirty.instructorEmail !== undefined ? dirty.instructorEmail : cls.instructorEmail;
-    var status = dirty.status !== undefined ? dirty.status : cls.status;
-    
-    var body = document.getElementById('editPanelBody');
-    body.innerHTML = `
-      <div class="edit-field">
-        <label>Class</label>
-        <div class="value">${escapeHtml(cls.title)}</div>
-      </div>
-      <div class="edit-field">
-        <label>Schedule</label>
-        <div class="value">${escapeHtml(cls.day)} &bull; ${escapeHtml(cls.startTime)} &bull; ${escapeHtml(cls.length)}</div>
-      </div>
-      <div class="edit-field">
-        <label>Location</label>
-        <div class="value">${escapeHtml(cls.location)}</div>
-      </div>
-      <div class="edit-field">
-        <label>Studio</label>
-        <select id="panelStudio">
-          <option value="">— Select —</option>
-          ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
-        </select>
-      </div>
-      <div class="edit-field">
-        <label>Instructor Email</label>
-        <input type="email" id="panelEmail" value="${escapeHtml(email)}" placeholder="instructor@email.com">
-      </div>
-      <div class="edit-field">
-        <label>Status</label>
-        <select id="panelStatus">
-          <option value="Active" ${status==='Active'?'selected':''}>Active</option>
-          <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
-        </select>
-      </div>
-    `;
-    
-    document.getElementById('editPanelOverlay').classList.add('show');
-    document.getElementById('editPanel').classList.add('show');
+ function openEditPanel(rowNum) {
+  editingRowNum = rowNum;
+  var cls = allData.classes.find(c => c.rowNum === rowNum);
+  if (!cls) return;
+  
+  var dirty = dirtyRows.get(rowNum) || {};
+  var studio = dirty.studio !== undefined ? dirty.studio : cls.studio;
+  var email = dirty.instructorEmail !== undefined ? dirty.instructorEmail : cls.instructorEmail;
+  var status = dirty.status !== undefined ? dirty.status : cls.status;
+  var studentList = dirty ? (dirty.students || cls.students || []) : (cls.students || []);
+  
+  var day = dirty.day !== undefined ? dirty.day : cls.day;
+  var startTime = dirty.startTime !== undefined ? dirty.startTime : cls.startTime;
+  var length = dirty.length !== undefined ? dirty.length : cls.length;
+  
+  var roles = allData.roles || [];
+  
+  var attendingHtml = '';
+  if (studentList.length === 0) {
+    attendingHtml = '<span style="color:#9ca3af;font-size:13px;">No students assigned. Search below to add.</span>';
+  } else {
+    attendingHtml = studentList.map(function(s) {
+      return '<div class="attendee-chip" data-email="' + escapeHtml(s) + '">' +
+        '<span>' + escapeHtml(getStudentNameByEmail(s)) + '</span>' +
+        '<button type="button" class="chip-remove" onclick="removeAttendee(' + rowNum + ', \'' + s.replace(/'/g, "\\'") + '\')" title="Remove">✕</button>' +
+      '</div>';
+    }).join('');
   }
+  
+  var body = document.getElementById('editPanelBody');
+  body.innerHTML = `
+    <div class="edit-field">
+      <label>Class</label>
+      <div class="value">${escapeHtml(cls.title)}</div>
+    </div>
+    <div class="edit-field">
+      <label>Current Schedule</label>
+      <div class="value">${escapeHtml(cls.day)} &bull; ${escapeHtml(cls.startTime)} &bull; ${escapeHtml(cls.length)}</div>
+    </div>
+    
+    <div class="edit-field">
+      <label>Day</label>
+      <select id="panelDay">
+        <option value="Monday" ${day==='Monday'?'selected':''}>Monday</option>
+        <option value="Tuesday" ${day==='Tuesday'?'selected':''}>Tuesday</option>
+        <option value="Wednesday" ${day==='Wednesday'?'selected':''}>Wednesday</option>
+        <option value="Thursday" ${day==='Thursday'?'selected':''}>Thursday</option>
+        <option value="Friday" ${day==='Friday'?'selected':''}>Friday</option>
+        <option value="Saturday" ${day==='Saturday'?'selected':''}>Saturday</option>
+        <option value="MW" ${day==='MW'?'selected':''}>MW</option>
+        <option value="TuTh" ${day==='TuTh'?'selected':''}>TuTh</option>
+        <option value="TuWTh" ${day==='TuWTh'?'selected':''}>TuWTh</option>
+      </select>
+    </div>
+    <div class="edit-field">
+      <label>Start Time</label>
+      <input type="text" id="panelStartTime" value="${escapeHtml(startTime)}" placeholder="5:15 PM">
+    </div>
+    <div class="edit-field">
+      <label>Length</label>
+      <input type="text" id="panelLength" value="${escapeHtml(length)}" placeholder="0:45">
+    </div>
+    
+    <div class="edit-field">
+      <label>Location</label>
+      <div class="value">${escapeHtml(cls.location)}</div>
+    </div>
+    <div class="edit-field">
+      <label>Studio</label>
+      <select id="panelStudio">
+        <option value="">— Select —</option>
+        ${allData.studios.map(s => `<option value="${escapeHtml(s.name)}" ${studio===s.name?'selected':''}>${escapeHtml(s.name)}</option>`).join('')}
+      </select>
+    </div>
+      <div class="edit-field">
+      <label>Instructor</label>
+      <select id="panelEmail" style="width:100%;border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px;font-size:13px;font-family:inherit;outline:none;cursor:pointer;">
+        ${renderInstructorOptions(email)}
+      </select>
+    </div>
+    
+    <div class="edit-field">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <label>Attending</label>
+        <span id="panelAttendeeCount" style="font-size:12px;color:var(--gray-500);font-weight:500;">${studentList.length} student${studentList.length!==1?'s':''}</span>
+      </div>
+      <div id="panelAttendingList" style="display:flex;flex-wrap:wrap;gap:8px;min-height:44px;padding:12px;border:1px solid var(--gray-200);border-radius:10px;background:var(--gray-50);margin-bottom:10px;">
+        ${attendingHtml}
+      </div>
+      
+      <div style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;">Bulk Add by Role</span>
+          <button type="button" onclick="refreshPanelRoles(${rowNum})" style="background:none;border:none;color:var(--primary);font-size:11px;font-weight:600;cursor:pointer;padding:2px 6px;border-radius:4px;">↻ Refresh</button>
+        </div>
+        <div id="panelBulkAddContainer" style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${renderBulkAddButtonsHtml(rowNum, roles)}
+        </div>
+      </div>
+      
+      <label style="font-size:11px;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;display:block;">Add Student</label>
+      <div style="position:relative;">
+        <input type="text" id="panelStudentSearch" placeholder="Search by name or email..." oninput="filterPanelStudents(${rowNum})" 
+          style="width:100%;border:1px solid var(--gray-200);border-radius:8px;padding:10px 12px 10px 36px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;">
+        <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:0.4;font-size:12px;">🔍</span>
+      </div>
+      <div id="panelStudentResults" style="border:1px solid var(--gray-200);border-radius:8px;overflow:hidden;max-height:200px;overflow-y:auto;background:#fff;display:none;margin-top:4px;"></div>
+    </div>
+    
+    <div class="edit-field">
+      <label>Status</label>
+      <select id="panelStatus">
+        <option value="Active" ${status==='Active'?'selected':''}>Active</option>
+        <option value="Deleted" ${status==='Deleted'?'selected':''}>Deleted</option>
+      </select>
+    </div>
+  `;
+  
+  document.getElementById('editPanelOverlay').classList.add('show');
+  document.getElementById('editPanel').classList.add('show');
+}
   
   function closeEditPanel() {
     document.getElementById('editPanelOverlay').classList.remove('show');
@@ -747,19 +1441,40 @@
     editingRowNum = null;
   }
   
-  function saveEditPanel() {
-    if (!editingRowNum) return;
-    var studio = document.getElementById('panelStudio').value;
-    var email = document.getElementById('panelEmail').value.trim();
-    var status = document.getElementById('panelStatus').value;
-    
-    queueChange(editingRowNum, 'studio', studio);
-    queueChange(editingRowNum, 'instructorEmail', email);
-    queueChange(editingRowNum, 'status', status);
-    
-    closeEditPanel();
-    showToast('Changes queued. Click Save Changes to apply.', 'success');
+function saveEditPanel() {
+  if (!editingRowNum) return;
+  
+  var studio = document.getElementById('panelStudio').value;
+  var email = document.getElementById('panelEmail').value.trim();
+  var status = document.getElementById('panelStatus').value;
+  var day = document.getElementById('panelDay').value;
+  var startTime = document.getElementById('panelStartTime').value.trim();
+  var length = document.getElementById('panelLength').value.trim();
+  var students = getPanelAttendees(editingRowNum);
+  
+  // Validate time format
+  if (startTime && !/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(startTime)) {
+    showToast('Start Time must be like "5:15 PM"', 'warning');
+    document.getElementById('panelStartTime').focus();
+    return;
   }
+  if (length && !/^\d{1,2}:\d{2}$/.test(length)) {
+    showToast('Length must be like "0:45"', 'warning');
+    document.getElementById('panelLength').focus();
+    return;
+  }
+  
+  queueChange(editingRowNum, 'day', day);
+  queueChange(editingRowNum, 'startTime', startTime);
+  queueChange(editingRowNum, 'length', length);
+  queueChange(editingRowNum, 'studio', studio);
+  queueChange(editingRowNum, 'instructorEmail', email);
+  queueChange(editingRowNum, 'status', status);
+  queueChange(editingRowNum, 'students', students);
+  
+  closeEditPanel();
+  showToast('Changes queued. Click Save Changes to apply.', 'success');
+}
   
   function deleteFromPanel() {
     if (!editingRowNum) return;
@@ -771,20 +1486,25 @@
   
   // ===== EDITING =====
   function queueChange(rowNum, field, value) {
-    if (!dirtyRows.has(rowNum)) {
-      var original = allData.classes.find(c => c.rowNum === rowNum);
-      dirtyRows.set(rowNum, { 
-        row: rowNum, 
-        studio: original.studio, 
-        instructorEmail: original.instructorEmail, 
-        status: original.status 
-      });
-    }
-    dirtyRows.get(rowNum)[field] = value;
-    filterAndRenderList();
-    if (currentView === 'calendar') renderCalendar();
-    updateSaveBar();
+  if (!dirtyRows.has(rowNum)) {
+    var original = allData.classes.find(c => c.rowNum === rowNum);
+    var origStudents = original.students ? original.students.slice() : [];
+    dirtyRows.set(rowNum, { 
+      row: rowNum, 
+      day: original.day,
+      startTime: original.startTime,
+      length: original.length,
+      studio: original.studio, 
+      instructorEmail: original.instructorEmail, 
+      status: original.status,
+      students: origStudents
+    });
   }
+  dirtyRows.get(rowNum)[field] = value;
+  filterAndRenderList();
+  if (currentView === 'calendar') renderCalendar();
+  updateSaveBar();
+}
   
   function updateSaveBar() {
     const bar = document.getElementById('saveBar');
@@ -797,6 +1517,90 @@
     }
   }
   
+  function openStudentModal() {
+  editingStudentRow = null;
+  document.getElementById('studentModalTitle').textContent = 'Add Student';
+  document.getElementById('studentName').value = '';
+  document.getElementById('studentEmail').value = '';
+  document.getElementById('studentRole').value = 'Dancer';
+  document.getElementById('studentNotes').value = '';
+  document.getElementById('studentSubmitBtn').textContent = 'Add Student';
+  document.getElementById('studentModalOverlay').classList.add('show');
+}
+
+function closeStudentModal() {
+  document.getElementById('studentModalOverlay').classList.remove('show');
+  editingStudentRow = null;
+}
+
+function editStudent(rowNum) {
+  var s = allData.students.find(x => x.rowNum === rowNum);
+  if (!s) return;
+  editingStudentRow = rowNum;
+  document.getElementById('studentModalTitle').textContent = 'Edit Student';
+  document.getElementById('studentName').value = s.name;
+  document.getElementById('studentEmail').value = s.email;
+  document.getElementById('studentRole').value = s.role || 'Dancer';
+  document.getElementById('studentNotes').value = s.notes || '';
+  document.getElementById('studentSubmitBtn').textContent = 'Save Changes';
+  document.getElementById('studentModalOverlay').classList.add('show');
+}
+
+function submitStudent() {
+  var data = {
+    name: document.getElementById('studentName').value.trim(),
+    email: document.getElementById('studentEmail').value.trim(),
+    role: document.getElementById('studentRole').value,
+    notes: document.getElementById('studentNotes').value.trim()
+  };
+  if (!data.name || !data.email) {
+    showToast('Name and Email are required', 'warning');
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+    showToast('Please enter a valid email', 'warning');
+    return;
+  }
+  
+  if (editingStudentRow) {
+    data.rowNum = editingStudentRow;
+    google.script.run
+      .withSuccessHandler(function() {
+        closeStudentModal();
+        showToast('Student updated', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Update failed: ' + err.message, 'error');
+      })
+      .updateStudent(data);
+  } else {
+    google.script.run
+      .withSuccessHandler(function() {
+        closeStudentModal();
+        showToast('Student added', 'success');
+        refreshData();
+      })
+      .withFailureHandler(function(err) {
+        showToast('Add failed: ' + err.message, 'error');
+      })
+      .addStudent(data);
+  }
+}
+
+function removeStudent(rowNum) {
+  if (!confirm('Delete this student from the database?')) return;
+  google.script.run
+    .withSuccessHandler(function() {
+      showToast('Student deleted', 'success');
+      refreshData();
+    })
+    .withFailureHandler(function(err) {
+      showToast('Delete failed: ' + err.message, 'error');
+    })
+    .deleteStudent(rowNum);
+}
+
   function saveAllChanges() {
     if (dirtyRows.size === 0) return;
     const updates = Array.from(dirtyRows.values());
@@ -834,6 +1638,31 @@
       .webDeleteClass(rowNum);
   }
   
+  function renderBulkAddButtonsHtml(rowNum, roles) {
+  if (!roles || roles.length === 0) {
+    return '<span style="font-size:12px;color:#9ca3af;">No roles configured</span>';
+  }
+  return roles.map(function(r) {
+    return '<button type="button" class="btn btn-secondary" style="padding:4px 10px;font-size:12px;" onclick="bulkAddByRole(' + rowNum + ', \'' + r.replace(/'/g, "\\'") + '\')">+' + escapeHtml(r) + '</button>';
+  }).join('');
+}
+
+function refreshPanelRoles(rowNum) {
+  google.script.run
+    .withSuccessHandler(function(roles) {
+      allData.roles = roles; // Update local cache so other panels benefit too
+      var container = document.getElementById('panelBulkAddContainer');
+      if (container) {
+        container.innerHTML = renderBulkAddButtonsHtml(rowNum, roles);
+      }
+      showToast('Roles refreshed from sheet', 'success');
+    })
+    .withFailureHandler(function(err) {
+      showToast('Refresh failed: ' + err.message, 'error');
+    })
+    .getRoles();
+}
+
   function updateStats() {
     const total = allData.classes.length;
     const active = allData.classes.filter(c => c.status === 'Active').length;
